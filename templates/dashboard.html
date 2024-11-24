@@ -52,6 +52,28 @@
                 }
                 updateSettings(document.getElementById('filter'));
             }
+            async function closeStream(){
+                try {
+                    const response = await fetch('/close_stream', {
+                        method: 'POST',
+                    });
+                    const result = await response.json();
+                    console.log(result.message);
+                } catch (error) {
+                    console.error('Error closing stream:', error);
+                }
+            }
+            async function startStream(){
+                try {
+                    const response = await fetch('/start_stream', {
+                        method: 'POST',
+                    });
+                    const result = await response.json();
+                    console.log(result.message);
+                } catch (error) {
+                    console.error('Error starting stream:', error);
+                }
+            }
         </script>
     </head>
     <body>
@@ -60,9 +82,10 @@
             <div class="setting-group">
                 <label for="filter">Choose a filter:</label>
                 <select id="filter" name="filter" onchange="showFilterSettings()">
+                    <option value="none">None</option>
                     <option value="ascii">ASCII</option>
                     <option value="dog">Difference of Gaussian</option>
-                    <option value="none">None</option>
+                    
                 </select>
             </div>
 
@@ -89,7 +112,7 @@
                 <div class="setting-group">
                     <label for="ascii_sharpness">Sharpness:</label>
                     <input type="range" id="ascii_sharpness" name="ascii_sharpness" 
-                           min="0" max="255" value="5" step="0.1" 
+                           min="0" max="255" value="" step="1" 
                            oninput="this.nextElementSibling.textContent = this.value"
                            onchange="updateSettings(this)">
                     <span class="value-display">5.0</span>
@@ -97,7 +120,7 @@
                 <div class="setting-group">
                     <label for="ascii_white_point">White Point:</label>
                     <input type="range" id="ascii_white_point" name="ascii_white_point" 
-                           min="0" max="255" value="200" step="1" 
+                           min="0" max="255" value="100" step="1" 
                            oninput="this.nextElementSibling.textContent = this.value"
                            onchange="updateSettings(this)">
                     <span class="value-display">200</span>
@@ -109,7 +132,7 @@
                 <div class="setting-group">
                     <label for="dog_sharpness">Sharpness:</label>
                     <input type="range" id="dog_sharpness" name="dog_sharpness" 
-                           min="0" max="10" value="5" step="0.1" 
+                           min="0" max="255" value="5" step="1" 
                            oninput="this.nextElementSibling.textContent = this.value"
                            onchange="updateSettings(this)">
                     <span class="value-display">5.0</span>
@@ -117,15 +140,24 @@
                 <div class="setting-group">
                     <label for="dog_white_point">White Point:</label>
                     <input type="range" id="dog_white_point" name="dog_white_point" 
-                           min="0" max="255" value="200" step="1" 
+                           min="0" max="255" value="100" step="1" 
                            oninput="this.nextElementSibling.textContent = this.value"
                            onchange="updateSettings(this)">
                     <span class="value-display">200</span>
                 </div>
             </div>
+            <div>
+                <button onclick="closeStream()">
+                    <h3> Stop Stream</h3>
+                </button>
+                <button onclick="startStream()">
+                    <h3> Start Stream</h3>
+                </button>
+                
+            </div>
 
             <div class="video-container">
-                <img src="/video_feed?nocache=true&ts=${new Date().getTime()}" width="640" height="480" />
+                <img src="/video_feed?nocache=true&ts=${new Date().getTime()}" />
 
             </div>
         </div>

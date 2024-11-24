@@ -1,7 +1,9 @@
 
 import cv2
+from matplotlib.testing import set_reproducibility_for_testing
 import numpy as np
 from scipy.signal import convolve2d
+from scipy import stats
 from scipy.ndimage import gaussian_filter
 from PIL import Image,ImageDraw, ImageFont
 
@@ -29,6 +31,44 @@ def sobel(image_array,treshold=80):
     return  (np.hypot(sobel_x, sobel_y), np.arctan2(sobel_y, sobel_x))
 
 
+def downsample_mode(img, kernel_size):
+    """
+    Downsample the image by taking the most common value in each kernel,
+    ignoring zeros. Optimized version using NumPy operations.
+    
+    Args:
+        img: Input image as 2D numpy array
+        kernel_size: Size of the downsampling kernel (e.g., 2 for 2x2 blocks)
+        
+    Returns:
+        Downsampled image as 2D numpy array
+    """
+    h, w = img.shape
+    new_h, new_w = h // kernel_size, w // kernel_size
+    
+    # Trim image to be divisible by kernel_size
+    img = img[:new_h * kernel_size, :new_w * kernel_size]
+    
+    # Reshape to group pixels into blocks
+    blocks = img.reshape(new_h, kernel_size, new_w, kernel_size)
+    result = np.zeros((new_h, new_w), dtype=img.dtype)
+    
+    for i in range(new_h):
+        for j in range(new_w):
+            block = blocks[i, :, j, :].ravel()
+            # Get non-zero values
+            valid_vals = block[block != 0]
+            if len(valid_vals) == 0:
+                result[i, j] = 0
+                continue
+                
+            # Find the most common value
+            unique_vals, counts = np.unique(valid_vals, return_counts=True)
+            result[i, j] = unique_vals[np.argmax(counts)]
+    
+    return result
+
+
 
 class SpriteASCIIGenerator:
     def __init__(self, grid_size=10,settings={
@@ -40,7 +80,8 @@ class SpriteASCIIGenerator:
             "white_point": 2
     }):
         self.grid_size = grid_size
-        ascii_chars = "#@?0Poc:. "
+        ascii_chars = "#@0oc:. "
+        # ascii_chars = " "
         edge_chars = "-/|\\"
         self.num_ascii_chars = len(ascii_chars)
         self.num_edge_chars = len(edge_chars)
@@ -138,7 +179,6 @@ class SpriteASCIIGenerator:
         # Convert to grayscale for ASCII mapping
         resized_gray = cv2.cvtColor(resized_color, cv2.COLOR_BGR2GRAY)
         
-        # Sobel Operator on resized image
         
         # Vectorized quantization for ASCII characters
         char_indices = np.multiply(resized_gray, self.num_ascii_chars / 256, 
@@ -150,19 +190,27 @@ class SpriteASCIIGenerator:
 
         if self.settings["use_edge"]:
             # calculate edges
-            sobel_mag, sobel_dir = sobel(difference_of_gaussian(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
-            sobel_mag = cv2.resize(sobel_mag, (new_width, new_height), 
-                                    interpolation=cv2.INTER_AREA)
-            sobel_dir = cv2.resize(sobel_dir, (new_width, new_height), 
-                                    interpolation=cv2.INTER_AREA)
+            # sobel_mag, sobel_dir = sobel(difference_of_gaussian(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
+            img_greyscale = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            img_greyscale = cv2.GaussianBlur(img_greyscale,(5,5),cv2.BORDER_DEFAULT)
+            sobel_mag,sobel_dir = sobel(difference_of_gaussian(img_greyscale,white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
             
-            edge_threshold = np.percentile(sobel_mag, 90)
+            edge_threshold = np.percentile(sobel_mag, self.settings["edge_threshold"])
             
-            # Create mask where edges are detected
+            
+            sobel_mag = downsample_mode(sobel_mag,self.grid_size)
+            
+            sobel_dir = (((sobel_dir )//(np.pi/4)) % self.num_edge_chars).astype(np.uint8)
+            
+            sobel_dir = downsample_mode(sobel_dir,self.grid_size)
+            
+            
+            
+            
             edge_mask = sobel_mag > edge_threshold
             
-            angle_to_index = ((sobel_dir[edge_mask] + np.pi/2)//(np.pi/4)) % self.num_edge_chars
-            edge_char_indices = self.num_ascii_chars + angle_to_index
+            angle_to_index = sobel_dir[edge_mask]
+            edge_char_indices =  self.num_ascii_chars + angle_to_index
             # Replace normal indices with edge indices where edge_mask is True
             char_indices[edge_mask] = edge_char_indices
         
@@ -172,6 +220,7 @@ class SpriteASCIIGenerator:
         output_img = np.full((output_height, output_width, 3), 
                            255, dtype=np.uint8)
         
+
         # Paste colored characters
         if self.settings["use_color"]:
             self._paste_characters(output_img, char_indices, resized_color)
