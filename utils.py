@@ -1,20 +1,21 @@
+
 import cv2
 import numpy as np
 from scipy.signal import convolve2d
 from scipy.ndimage import gaussian_filter
 from PIL import Image,ImageDraw, ImageFont
 
-ASCII_CHARS = "@#H*+:. "
-EDGE_CHARS = ['-','|','/','\\']
 
 
 
-def difference_of_gaussian(image_obj, sigma=2,k=1.6,white_point=100,shapness=2):
+def difference_of_gaussian(image_obj, sigma=2,k=1.6,white_point=100,sharpness=4):
+
     g_sigma = gaussian_filter(image_obj, sigma)
     g_k = gaussian_filter(image_obj, k*sigma)
-    dog = (1+shapness)*g_sigma - shapness*g_k
-    dog_thresholded = np.where(dog > white_point, 255.0, 0.0)
-    return dog_thresholded
+    dog = (1+sharpness)*g_sigma - sharpness*g_k
+    dog_threshold = np.where(dog > white_point, 255.0, 0.0)
+
+    return dog_threshold
     
     
     
@@ -28,81 +29,49 @@ def sobel(image_array,treshold=80):
     return  (np.hypot(sobel_x, sobel_y), np.arctan2(sobel_y, sobel_x))
 
 
-def generate_ascii_image(img, grid_size=10, ASCII_CHARS = "@MH*+:. "):
-    # Load the image in grayscale
-    grey_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    height, width,_ = img.shape
-    new_width, new_height = width // grid_size, height // grid_size
-
-    quantized_img_resized = cv2.resize(grey_img, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
-
-    # Quantize the grayscale image
-    quantized_array = quantized_img_resized // 32
-
-    # Precompute ASCII and edge thresholds
-    ascii_chars = np.array(list(ASCII_CHARS))
-    ascii_art_array = ascii_chars[quantized_array]
-
-    # Create an output image
-    # Reading an image in default mode
-     # Create an output image
-    canvas = Image.new("RGB", (width, height), "white")
-    draw = ImageDraw.Draw(canvas)
-    font_path = "fonts/dogica.ttf"
-    # Load font
-    font = ImageFont.truetype(font=font_path,size=grid_size)
-
-    
-    # fontScale
-    fontScale = 1
-    
-    # Blue color in BGR
-    color = (0, 0, 0)
-
-    # Line thickness of 2 px
-    thickness = 1
-    y = 0
-    for row in ascii_art_array:
-        row = "".join(row)
-        draw.text((0, y), row, fill=color, font=font)
-        y+=grid_size
-    
-    # 
-    return cv2.cvtColor(np.array(canvas), cv2.COLOR_RGB2BGR)
-
-import numpy as np
-import cv2
-from PIL import Image, ImageDraw, ImageFont
 
 class SpriteASCIIGenerator:
-    def __init__(self, grid_size=10):
+    def __init__(self, grid_size=10,settings={
+            "use_edge": False,
+            "edge_threshold": 90,
+            "use_color": False,
+            "font_size": 8,
+            "sharpness": 100,
+            "white_point": 2
+    }):
         self.grid_size = grid_size
-        self.ascii_chars = "@#MH*+o:. "
-        self.num_chars = len(self.ascii_chars)
+        ascii_chars = "#@?0Poc:. "
+        edge_chars = "-/|\\"
+        self.num_ascii_chars = len(ascii_chars)
+        self.num_edge_chars = len(edge_chars)
+        self.colors = [(41, 9,53 ),(  209,232,255)]
+        self.settings = settings
         
         # Cache font
         self.font = ImageFont.truetype(font="fonts/dogica.ttf", size=self.grid_size)
         
         # Generate and cache sprite sheet
-        self.sprite_sheet, self.char_width = self._generate_sprite_sheet()
+        self.char_sprite_sheet, self.char_width = self._generate_sprite_sheet(ascii_chars+edge_chars)
         
         # Pre-compute character masks
-        self.char_masks = self._precompute_char_masks()
+        self.char_masks = self._precompute_char_masks(self.char_sprite_sheet,len(ascii_chars+edge_chars))
+
         
-    def _generate_sprite_sheet(self):
+    def _generate_sprite_sheet(self, char_list):
         """Generate a sprite sheet containing all ASCII characters"""
         # Measure character width
+        num_chars = len(char_list)
         temp_img = Image.new('RGB', (self.grid_size * 2, self.grid_size), 'white')
         temp_draw = ImageDraw.Draw(temp_img)
         char_width = temp_draw.textlength("@", font=self.font)
         
         # Create sprite sheet
-        sheet_width = int(char_width * self.num_chars)
+        sheet_width = int(char_width * num_chars)
         sprite_img = Image.new('RGB', (sheet_width, self.grid_size), 'white')
         sprite_draw = ImageDraw.Draw(sprite_img)
         
         # Draw characters
-        for i, char in enumerate(self.ascii_chars):
+        for i, char in enumerate(char_list):
             sprite_draw.text((i * char_width, 0), char, fill='black', font=self.font)
         
         # Convert to binary mask
@@ -111,75 +80,91 @@ class SpriteASCIIGenerator:
         
         return sprite_sheet, int(char_width)
     
-    def _precompute_char_masks(self):
+    def _precompute_char_masks(self,sprite_sheet,num_chars):
         """Pre-compute binary masks for all characters"""
         masks = []
-        for i in range(self.num_chars):
+        for i in range(num_chars):
             sprite_x = int(i * self.char_width)
-            char_sprite = self.sprite_sheet[:, sprite_x:sprite_x + self.char_width]
+            char_sprite = sprite_sheet[:, sprite_x:sprite_x + self.char_width]
             masks.append(char_sprite > 0)
         return masks
     
-    def _paste_colored_characters(self, output_img, char_indices, color_data):
-        """Paste characters with their corresponding colors"""
+    def _paste_characters(self, output_img, char_indices, color_data=None):
+        """
+        Paste characters onto the output image with optional color data.
+        
+        Args:
+            output_img: Target image array
+            char_indices: 2D array of character indices
+            color_data: Optional 3D array of RGB colors for each character position
+        """
         height, width = char_indices.shape
         
-        for i in range(height):
-            y = i * self.grid_size
-            if y + self.grid_size > output_img.shape[0]:
-                break
-                
-            for j in range(width):
-                x = j * self.char_width
-                if x + self.char_width > output_img.shape[1]:
-                    break
-                
+        # Pre-calculate valid dimensions
+        max_y = min(height * self.grid_size, output_img.shape[0])
+        max_x = min(width * self.char_width, output_img.shape[1])
+        
+        # Calculate valid grid positions
+        y_positions = range(0, max_y, self.grid_size)
+        x_positions = range(0, max_x, self.char_width)
+        
+        # Iterate only over valid positions
+        for i, y in enumerate(y_positions):
+            for j, x in enumerate(x_positions):
                 char_idx = char_indices[i, j]
                 mask = self.char_masks[char_idx]
-                color = color_data[i, j]
-                
-                # Create 3D mask for color channels
-
-                
-                # Apply color to the character
                 region = output_img[y:y + self.grid_size, x:x + self.char_width]
-                    # Apply color to each channel separately
-                for c in range(3):
-                    region[..., c][mask] = color[c]
-                    
-    def _paste_greyscale_characters(self, output_img, char_indices):
-        """Vectorized version of character pasting"""
-        height, width = char_indices.shape
-        
-        for i in range(height):
-            for j in range(width):
-                y = i * self.grid_size
-                x = j * self.char_width
                 
-                if y + self.grid_size <= output_img.shape[0] and \
-                x + self.char_width <= output_img.shape[1]:
-                    char_idx = char_indices[i, j]
-                    mask = self.char_masks[char_idx]
-                    output_img[y:y + self.grid_size, 
-                            x:x + self.char_width][mask] = 0
+                if color_data is not None:
+                    color = color_data[i, j]
+                    for c in range(3):
+                        region[..., c][mask] = color[c]
+                else:
+                    # Greyscale version: simply apply mask
+                    for c in range(3):
+                        region[...,c][mask] = self.colors[0][c]
+                        region[...,c][~mask] = self.colors[1][c]
                 
-    def generate_ascii(self, img,use_color = False):
+    def generate_ascii(self, img):
         # Get original dimensions and calculate new size
         height, width = img.shape[:2]
+
         new_width = width // self.grid_size
         new_height = height // self.grid_size
         
         # Resize with color preservation
         resized_color = cv2.resize(img, (new_width, new_height), 
                                  interpolation=cv2.INTER_AREA)
-        
         # Convert to grayscale for ASCII mapping
         resized_gray = cv2.cvtColor(resized_color, cv2.COLOR_BGR2GRAY)
         
+        # Sobel Operator on resized image
+        
         # Vectorized quantization for ASCII characters
-        char_indices = np.multiply(resized_gray, self.num_chars / 256,
-                                 dtype=np.float32).astype(np.int32)
-        char_indices = np.clip(char_indices, 0, self.num_chars - 1)
+        char_indices = np.multiply(resized_gray, self.num_ascii_chars / 256, 
+                                dtype=np.float32).astype(np.int32)
+        char_indices = np.clip(char_indices, 0, self.num_ascii_chars - 1)
+        
+        
+        
+
+        if self.settings["use_edge"]:
+            # calculate edges
+            sobel_mag, sobel_dir = sobel(difference_of_gaussian(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
+            sobel_mag = cv2.resize(sobel_mag, (new_width, new_height), 
+                                    interpolation=cv2.INTER_AREA)
+            sobel_dir = cv2.resize(sobel_dir, (new_width, new_height), 
+                                    interpolation=cv2.INTER_AREA)
+            
+            edge_threshold = np.percentile(sobel_mag, 90)
+            
+            # Create mask where edges are detected
+            edge_mask = sobel_mag > edge_threshold
+            
+            angle_to_index = ((sobel_dir[edge_mask] + np.pi/2)//(np.pi/4)) % self.num_edge_chars
+            edge_char_indices = self.num_ascii_chars + angle_to_index
+            # Replace normal indices with edge indices where edge_mask is True
+            char_indices[edge_mask] = edge_char_indices
         
         # Create output image (white background)
         output_height = new_height * self.grid_size
@@ -188,14 +173,20 @@ class SpriteASCIIGenerator:
                            255, dtype=np.uint8)
         
         # Paste colored characters
-        if use_color:
-            self._paste_colored_characters(output_img, char_indices, resized_color)
+        if self.settings["use_color"]:
+            self._paste_characters(output_img, char_indices, resized_color)
         else:
-            self._paste_greyscale_characters(output_img,char_indices)
-        
+            self._paste_characters(output_img,char_indices)
         return output_img
 
-def generate_ascii_image_sprite(img, grid_size=10):
+def generate_ascii_image_sprite(img, grid_size=8,settings={
+            "use_edge": False,
+            "edge_threshold": 90,
+            "use_color": False,
+            "font_size": 8,
+            "sharpness": 100,
+            "white_point": 2
+}):
     """Convenience function to generate colored ASCII art"""
-    generator = SpriteASCIIGenerator(grid_size=grid_size)
+    generator = SpriteASCIIGenerator(grid_size=grid_size,settings=settings)
     return generator.generate_ascii(img)

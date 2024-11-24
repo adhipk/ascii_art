@@ -9,7 +9,7 @@ def main():
     args = parser.parse_args()
     image_path = args.image_path
     img = cv2.imread(image_path)
-    rescaled_img = generate_ascii_image_sprite(img,32)
+    rescaled_img = generate_ascii_image_sprite(img,8)
     result = cv2.imwrite("result.png",rescaled_img)
     print(result)
 if __name__ == "__main__":

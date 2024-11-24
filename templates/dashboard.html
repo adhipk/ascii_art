@@ -1,0 +1,133 @@
+<html>
+    <head>
+        <title>Dashboard</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+            .container { max-width: 1000px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            select, input { padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+            .video-container { margin-top: 20px; text-align: center; }
+            .filter-settings { display: none; margin-top: 15px; padding: 15px; background-color: #f8f9fa; border-radius: 4px; }
+            .setting-group { margin-bottom: 15px; }
+            label { display: inline-block; width: 120px; margin-right: 10px; }
+            .checkbox-label { width: auto; }
+            .value-display { display: inline-block; width: 40px; text-align: right; }
+        </style>
+        <script>
+            async function updateSettings(element) {
+                const filter = document.getElementById('filter').value;
+                const formData = new FormData();
+                formData.append('filter', filter);
+                
+                // Get all inputs from the current filter's settings
+                const settingsDiv = document.getElementById(`${filter}-settings`);
+                if (settingsDiv) {
+                    const inputs = settingsDiv.querySelectorAll('input');
+                    inputs.forEach(input => {
+                        const value = input.type === 'checkbox' ? input.checked : input.value;
+                        formData.append(input.name, value);
+                    });
+                }
+
+                try {
+                    const response = await fetch('/set_filter', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    console.log(result.message);
+                } catch (error) {
+                    console.error('Error updating settings:', error);
+                }
+            }
+
+            function showFilterSettings() {
+                const filter = document.getElementById('filter').value;
+                document.getElementById('ascii-settings').style.display = 'none';
+                document.getElementById('dog-settings').style.display = 'none';
+                
+                if (filter === 'ascii') {
+                    document.getElementById('ascii-settings').style.display = 'block';
+                } else if (filter === 'dog') {
+                    document.getElementById('dog-settings').style.display = 'block';
+                }
+                updateSettings(document.getElementById('filter'));
+            }
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Video Feed Control Panel</h1>
+            <div class="setting-group">
+                <label for="filter">Choose a filter:</label>
+                <select id="filter" name="filter" onchange="showFilterSettings()">
+                    <option value="ascii">ASCII</option>
+                    <option value="dog">Difference of Gaussian</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+
+            <div id="ascii-settings" class="filter-settings">
+                <h3>ASCII Filter Settings</h3>
+                <div class="setting-group">
+                    <label for="ascii_edge_data">Use Edge Data:</label>
+                    <input type="checkbox" id="ascii_edge_data" name="ascii_edge_data" 
+                           onchange="updateSettings(this)">
+                </div>
+                <div class="setting-group">
+                    <label for="ascii_edge_threshold">Edge Threshold:</label>
+                    <input type="range" id="ascii_edge_threshold" name="ascii_edge_threshold" 
+                           min="0" max="100" value="50" step="1" 
+                           oninput="this.nextElementSibling.textContent = this.value"
+                           onchange="updateSettings(this)">
+                    <span class="value-display">50</span>
+                </div>
+                <div class="setting-group">
+                    <label for="ascii_use_color">Use Color:</label>
+                    <input type="checkbox" id="ascii_use_color" name="ascii_use_color" 
+                           onchange="updateSettings(this)">
+                </div>
+                <div class="setting-group">
+                    <label for="ascii_sharpness">Sharpness:</label>
+                    <input type="range" id="ascii_sharpness" name="ascii_sharpness" 
+                           min="0" max="255" value="5" step="0.1" 
+                           oninput="this.nextElementSibling.textContent = this.value"
+                           onchange="updateSettings(this)">
+                    <span class="value-display">5.0</span>
+                </div>
+                <div class="setting-group">
+                    <label for="ascii_white_point">White Point:</label>
+                    <input type="range" id="ascii_white_point" name="ascii_white_point" 
+                           min="0" max="255" value="200" step="1" 
+                           oninput="this.nextElementSibling.textContent = this.value"
+                           onchange="updateSettings(this)">
+                    <span class="value-display">200</span>
+                </div>
+            </div>
+
+            <div id="dog-settings" class="filter-settings">
+                <h3>Difference of Gaussian Settings</h3>
+                <div class="setting-group">
+                    <label for="dog_sharpness">Sharpness:</label>
+                    <input type="range" id="dog_sharpness" name="dog_sharpness" 
+                           min="0" max="10" value="5" step="0.1" 
+                           oninput="this.nextElementSibling.textContent = this.value"
+                           onchange="updateSettings(this)">
+                    <span class="value-display">5.0</span>
+                </div>
+                <div class="setting-group">
+                    <label for="dog_white_point">White Point:</label>
+                    <input type="range" id="dog_white_point" name="dog_white_point" 
+                           min="0" max="255" value="200" step="1" 
+                           oninput="this.nextElementSibling.textContent = this.value"
+                           onchange="updateSettings(this)">
+                    <span class="value-display">200</span>
+                </div>
+            </div>
+
+            <div class="video-container">
+                <img src="/video_feed?nocache=true&ts=${new Date().getTime()}" width="640" height="480" />
+
+            </div>
+        </div>
+    </body>
+</html>
