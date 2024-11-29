@@ -84,7 +84,6 @@
                 <select id="filter" name="filter" onchange="showFilterSettings()">
                     <option value="none">None</option>
                     <option value="ascii">ASCII</option>
-                    <option value="dog">Difference of Gaussian</option>
                     
                 </select>
             </div>
@@ -127,25 +126,7 @@
                 </div>
             </div>
 
-            <div id="dog-settings" class="filter-settings">
-                <h3>Difference of Gaussian Settings</h3>
-                <div class="setting-group">
-                    <label for="dog_sharpness">Sharpness:</label>
-                    <input type="range" id="dog_sharpness" name="dog_sharpness" 
-                           min="0" max="255" value="5" step="1" 
-                           oninput="this.nextElementSibling.textContent = this.value"
-                           onchange="updateSettings(this)">
-                    <span class="value-display">5.0</span>
-                </div>
-                <div class="setting-group">
-                    <label for="dog_white_point">White Point:</label>
-                    <input type="range" id="dog_white_point" name="dog_white_point" 
-                           min="0" max="255" value="100" step="1" 
-                           oninput="this.nextElementSibling.textContent = this.value"
-                           onchange="updateSettings(this)">
-                    <span class="value-display">200</span>
-                </div>
-            </div>
+            
             <div>
                 <button onclick="closeStream()">
                     <h3> Stop Stream</h3>

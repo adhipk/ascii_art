@@ -1,13 +1,13 @@
 
 import cv2
-from matplotlib.testing import set_reproducibility_for_testing
+
 import numpy as np
 from scipy.signal import convolve2d
-from scipy import stats
-from scipy.ndimage import gaussian_filter
+import threading
+from scipy.ndimage import gaussian_filter,sobel
 from PIL import Image,ImageDraw, ImageFont
-
-
+from scipy import stats
+from numba import njit
 
 
 def difference_of_gaussian(image_obj, sigma=2,k=1.6,white_point=100,sharpness=4):
@@ -80,7 +80,7 @@ class SpriteASCIIGenerator:
             "white_point": 2
     }):
         self.grid_size = grid_size
-        ascii_chars = "#@0oc:. "
+        ascii_chars = "@%#*+=:-. "
         # ascii_chars = " "
         edge_chars = "-/|\\"
         self.num_ascii_chars = len(ascii_chars)
@@ -166,69 +166,68 @@ class SpriteASCIIGenerator:
                         region[...,c][mask] = self.colors[0][c]
                         region[...,c][~mask] = self.colors[1][c]
                 
-    def generate_ascii(self, img):
-        # Get original dimensions and calculate new size
-        height, width = img.shape[:2]
 
+
+    def process_brightness(self,img,new_width,new_height, results, index):
+        
+
+        resized_gray = cv2.cvtColor(cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+        char_indices = np.multiply(resized_gray, self.num_ascii_chars / 256, 
+                                    dtype=np.float32).astype(np.int32)
+        char_indices = np.clip(char_indices, 0, self.num_ascii_chars - 1)
+        results[index] = char_indices
+
+    def process_edges(self,img, results, index):
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), cv2.BORDER_DEFAULT)
+        sobel_mag, sobel_dir = sobel(difference_of_gaussian(blurred, white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
+        
+        edge_threshold = np.percentile(sobel_mag, self.settings["edge_threshold"])
+        
+        
+        sobel_mag_down = downsample_mode(sobel_mag, self.grid_size)
+        edge_mask = sobel_mag_down > edge_threshold
+        sobel_dir_down = downsample_mode((sobel_dir // (np.pi / 4)) % self.num_edge_chars, self.grid_size).astype(np.uint8)
+        
+        edge_indices = self.num_ascii_chars + sobel_dir_down[edge_mask]
+        results[index] = (edge_mask, edge_indices)
+
+    def generate_ascii(self,img):
+        # Placeholder for results
+        results = [None, None]
+        threads = []
+        height, width = img.shape[:2]
         new_width = width // self.grid_size
         new_height = height // self.grid_size
-        
-        # Resize with color preservation
-        resized_color = cv2.resize(img, (new_width, new_height), 
-                                 interpolation=cv2.INTER_AREA)
-        # Convert to grayscale for ASCII mapping
-        resized_gray = cv2.cvtColor(resized_color, cv2.COLOR_BGR2GRAY)
-        
-        
-        # Vectorized quantization for ASCII characters
-        char_indices = np.multiply(resized_gray, self.num_ascii_chars / 256, 
-                                dtype=np.float32).astype(np.int32)
-        char_indices = np.clip(char_indices, 0, self.num_ascii_chars - 1)
-        
-        
-        
+        # Dispatch threads
+        threads.append(threading.Thread(target=self.process_brightness, args=(img,new_width,new_height, results, 0)))
+        threads.append(threading.Thread(target=self.process_edges, args=(img, results, 1)))
 
-        if self.settings["use_edge"]:
-            # calculate edges
-            # sobel_mag, sobel_dir = sobel(difference_of_gaussian(cv2.cvtColor(img,cv2.COLOR_BGR2GRAY),white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
-            img_greyscale = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-            img_greyscale = cv2.GaussianBlur(img_greyscale,(5,5),cv2.BORDER_DEFAULT)
-            sobel_mag,sobel_dir = sobel(difference_of_gaussian(img_greyscale,white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
-            
-            edge_threshold = np.percentile(sobel_mag, self.settings["edge_threshold"])
-            
-            
-            sobel_mag = downsample_mode(sobel_mag,self.grid_size)
-            
-            sobel_dir = (((sobel_dir )//(np.pi/4)) % self.num_edge_chars).astype(np.uint8)
-            
-            sobel_dir = downsample_mode(sobel_dir,self.grid_size)
-            
-            
-            
-            
-            edge_mask = sobel_mag > edge_threshold
-            
-            angle_to_index = sobel_dir[edge_mask]
-            edge_char_indices =  self.num_ascii_chars + angle_to_index
-            # Replace normal indices with edge indices where edge_mask is True
-            char_indices[edge_mask] = edge_char_indices
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # Combine results
+        brightness_indices = results[0]
+        edge_mask, edge_indices = results[1]
         
+        combined_indices = brightness_indices.copy()
+        combined_indices[edge_mask] = edge_indices
+
         # Create output image (white background)
         output_height = new_height * self.grid_size
         output_width = new_width * self.char_width
         output_img = np.full((output_height, output_width, 3), 
                            255, dtype=np.uint8)
         
-
-        # Paste colored characters
-        if self.settings["use_color"]:
-            self._paste_characters(output_img, char_indices, resized_color)
-        else:
-            self._paste_characters(output_img,char_indices)
+        # Paste chars
+        
+        self._paste_characters(output_img,combined_indices)
         return output_img
 
-def generate_ascii_image_sprite(img, grid_size=8,settings={
+
+def generate_ascii_image_sprite(img, grid_size=16,settings={
             "use_edge": False,
             "edge_threshold": 90,
             "use_color": False,

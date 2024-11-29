@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 import cv2
-from utils import difference_of_gaussian, generate_ascii_image_sprite
+from utils import generate_ascii_image_sprite
 from threading import Thread, Event
 import time
 from contextlib import asynccontextmanager
@@ -15,12 +15,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class WebcamVideoStream:
-    def __init__(self, src=0):
+    def __init__(self, src=0, width=800, height=450, fps=30):
         self.stream = cv2.VideoCapture(src)
         self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.stream.set(cv2.CAP_PROP_FPS, 30)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        self.stream.set(cv2.CAP_PROP_FPS, fps)
         self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         
         self.frame = None
@@ -63,7 +63,7 @@ vs = None
 current_filter = "none"
 filter_settings = {
     "ascii": {
-        "use_edge": False,
+        "use_edge": True,
         "edge_threshold": 50,
         "use_color": False,
         "font_size": 8,
@@ -75,13 +75,14 @@ filter_settings = {
         "white_point": 200
     }
 }
+current_resolution = {"width": 800, "height": 450}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global vs
     try:
         logger.info("Starting video stream...")
-        vs = WebcamVideoStream().start()
+        vs = None  # Ensure vs is initialized as None
         yield
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
@@ -99,14 +100,7 @@ def apply_filter(frame, filter_name, filter_settings):
     if frame is None:
         return None
     try:
-        if filter_name == "ascii":
-            return generate_ascii_image_sprite(frame, 8, filter_settings['ascii'])
-        elif filter_name == "dog":
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            settings = filter_settings['dog']
-            return difference_of_gaussian(frame, white_point=settings["white_point"], sharpness=settings["sharpness"])
-        else:
-            return frame
+        return generate_ascii_image_sprite(frame, 8, filter_settings['ascii'])
     except Exception as e:
         logger.error(f"Error applying filter {filter_name}: {str(e)}")
         return frame
@@ -162,9 +156,30 @@ async def video_feed():
 async def dashboard(request: Request):
     return templates.TemplateResponse(request=request, name="dashboard.html")
 
+@app.post("/start_stream")
+async def start_stream(
+    width: int = Form(800), 
+    height: int = Form(450),
+    fps: int = Form(30)
+):
+    global vs, current_resolution
+    try:
+        # Stop existing stream if it exists
+        if vs:
+            vs.stop()
+        
+        # Update current resolution
+        current_resolution = {"width": width, "height": height}
+        
+        # Start new stream with specified parameters
+        vs = WebcamVideoStream(src=0, width=width, height=height, fps=fps).start()
+        return {"message": "Stream started", "resolution": current_resolution}
+    except Exception as e:
+        logger.error(f"Error starting stream: {str(e)}")
+        return Response("Failed to start stream", status_code=500)
+
 @app.post("/set_filter")
 async def set_filter(
-    filter: str = Form(...),
     ascii_edge_data: bool = Form(False),
     ascii_edge_threshold: int = Form(50),
     ascii_font_size: int = Form(8),
@@ -176,7 +191,7 @@ async def set_filter(
 ):
     global current_filter, filter_settings
     try:
-        current_filter = filter
+        current_filter = "ascii"
         filter_settings = {
             "ascii": {
                 "use_edge": ascii_edge_data,
@@ -195,6 +210,7 @@ async def set_filter(
     except Exception as e:
         logger.error(f"Error updating filter settings: {str(e)}")
         return Response("Failed to update filter settings", status_code=500)
+
 @app.post('/close_stream')
 async def close_stream():
     try:
@@ -206,7 +222,6 @@ async def close_stream():
         return Response("error closing stream")
     
 if __name__ == "__main__":
-    
     try:
         uvicorn.run(app, host="0.0.0.0", port=8000)
     except KeyboardInterrupt:
