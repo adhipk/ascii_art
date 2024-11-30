@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 import cv2
-from utils import generate_ascii_image_sprite
+from ascii import generate_ascii_image_sprite
 from threading import Thread, Event
 import time
 from contextlib import asynccontextmanager
