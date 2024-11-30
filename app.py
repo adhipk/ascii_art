@@ -100,7 +100,7 @@ def apply_filter(frame, filter_name, filter_settings):
     if frame is None:
         return None
     try:
-        return generate_ascii_image_sprite(frame, 8, filter_settings['ascii'])
+        return generate_ascii_image_sprite(frame, filter_settings['ascii'])
     except Exception as e:
         logger.error(f"Error applying filter {filter_name}: {str(e)}")
         return frame

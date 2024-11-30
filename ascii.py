@@ -8,15 +8,16 @@ import threading
 import os
 import cv2
 class SpriteASCIIGenerator:
-    def __init__(self, grid_size=10,settings={
+    def __init__(self ,settings={
             "use_edge": False,
             "edge_threshold": 90,
             "use_color": False,
             "font_size": 8,
             "sharpness": 100,
             "white_point": 2
+            
     }):
-        self.grid_size = grid_size
+        self.grid_size = settings['font_size']
         ascii_chars = "@%#*+:. "
         # ascii_chars = " "
         edge_chars = "-/|\\"
@@ -295,9 +296,9 @@ class SpriteASCIIGenerator:
         return output_img
 
 
-def generate_ascii_image_sprite(img, grid_size, settings):
+def generate_ascii_image_sprite(img, settings):
     """Convenience function to generate colored ASCII art"""
-    generator = SpriteASCIIGenerator(grid_size=grid_size,settings=settings)
+    generator = SpriteASCIIGenerator(settings)
     return generator.generate_ascii(img)
 
 
@@ -317,7 +318,7 @@ def main():
         "sharpness": 5,
         "white_point": 128
     }
-    rescaled_img = generate_ascii_image_sprite(img,8,settings)
+    rescaled_img = generate_ascii_image_sprite(img,settings)
     
     result = cv2.imwrite("result.png",rescaled_img)
     print(result)
