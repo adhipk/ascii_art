@@ -7,6 +7,7 @@ from utils import difference_of_gaussian,sobel, hex_to_bgr, downsample_mode
 import threading
 import os
 import cv2
+
 class SpriteASCIIGenerator:
     def __init__(self ,settings={
             "use_edge": False,
@@ -107,7 +108,7 @@ class SpriteASCIIGenerator:
             try:
                 # Load cached masks
                 cached_data = np.load(cache_file)
-                char_masks = [cached_data[f'mask_{i}'] for i in range(num_chars)]
+                char_masks = np.array([cached_data[f'mask_{i}'] for i in range(num_chars)])
                 
                 # print(f"Loaded character masks from cache: {cache_file}")
                 return char_masks
@@ -159,79 +160,27 @@ class SpriteASCIIGenerator:
             masks.append(char_sprite > 0)
         return masks
     
-    def _paste_characters(self, output_img, char_indices, color_data=None):
+    def _paste_characters(self, output_img, char_indices):
         """
-        Optimized character pasting with vectorized operations.
+        Paste char masks into output image
         
         Args:
-            output_img: Target image array
+            output_img: Target image array (modified in-place)
             char_indices: 2D array of character indices
             color_data: Optional 3D array of RGB colors for each character position
         """
         height, width = char_indices.shape
+        new_height,new_width = height* self.grid_size, width*self.grid_size
         
-        # Pre-calculate valid dimensions
-        max_y = min(height * self.grid_size, output_img.shape[0])
-        max_x = min(width * self.char_width, output_img.shape[1])
         
-        # Compute valid positions
-        y_max = len(range(0, max_y, self.grid_size))
-        x_max = len(range(0, max_x, self.char_width))
         
-        # Prepare character masks and indices for vectorized processing
-        valid_char_indices = char_indices[:y_max, :x_max]
-        
-        if color_data is not None:
-            # Color mode - vectorized color application
-            color_region = color_data[:y_max, :x_max]
-            
-            for char_idx in np.unique(valid_char_indices):
-                # Create mask for this specific character
-                char_mask = self.char_masks[char_idx]
-                
-                # Find positions of this character
-                idx_positions = np.argwhere(valid_char_indices == char_idx)
-                
-                for y, x in idx_positions:
-                    # Compute image region coordinates
-                    y_start = y * self.grid_size
-                    x_start = x * self.char_width
-                    
-                    # Get region and apply color through mask
-                    region = output_img[y_start:y_start + self.grid_size, 
-                                        x_start:x_start + self.char_width]
-                    
-                    # Vectorized color application
-                    region_color = color_region[y, x]
-                    for c in range(3):
-                        region[..., c][char_mask] = region_color[c]
-        
-        else:
-            # Greyscale mode - precompute background and foreground colors
-            bg_color, fg_color = [hex_to_bgr(value) for value in self.colors]
-            
-            for char_idx in np.unique(valid_char_indices):
-                # Create mask for this specific character
-                char_mask = self.char_masks[char_idx]
-                
-                # Find positions of this character
-                idx_positions = np.argwhere(valid_char_indices == char_idx)
-                
-                for y, x in idx_positions:
-                    # Compute image region coordinates
-                    y_start = y * self.grid_size
-                    x_start = x * self.char_width
-                    
-                    # Get region and apply colors
-                    region = output_img[y_start:y_start + self.grid_size, 
-                                        x_start:x_start + self.char_width]
-                    
-                    # Vectorized color application
-                    for c in range(3):
-                        region[..., c][char_mask] = bg_color[c]
-                        region[..., c][~char_mask] = fg_color[c]
-        
-        return output_img
+        # Create a tensor of character masks (nx8x8)
+        char_mask = self.char_masks[char_indices]
+
+        char_mask = char_mask.transpose(0, 2, 1, 3).reshape(new_height, new_width)
+        # Greyscale mode - use background color
+        bg_color = hex_to_bgr(self.colors[0])
+        output_img[char_mask] = bg_color
 
 
     def process_brightness(self,img,new_width,new_height, results, index):
@@ -287,8 +236,9 @@ class SpriteASCIIGenerator:
         # Create output image (white background)
         output_height = new_height * self.grid_size
         output_width = new_width * self.char_width
+        fg_color = hex_to_bgr(self.colors[1])
         output_img = np.full((output_height, output_width, 3), 
-                           255, dtype=np.uint8)
+                           fg_color, dtype=np.uint8)
         
         # Paste chars
         
