@@ -140,8 +140,22 @@ async def home():
 
 @app.get("/video_feed")
 async def video_feed():
+    global vs, current_resolution
     if vs is None or vs.stopped.is_set():
-        return Response("Video stream not available", status_code=503)
+        try:
+            # Use default resolution if not set
+            width = current_resolution.get('width', 800)
+            height = current_resolution.get('height', 450)
+            
+            vs = WebcamVideoStream(
+                src=0, 
+                width=width, 
+                height=height
+            ).start()
+        except Exception as e:
+            logger.error(f"Failed to start video stream: {e}")
+            return Response("Could not start video stream", status_code=503)
+    
         
     response = StreamingResponse(
         generate_frames(),
