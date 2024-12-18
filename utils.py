@@ -1,38 +1,12 @@
 
-
-
-
-from random import gauss
 import numpy as np
 from scipy.signal import convolve2d
 
-from scipy.ndimage import gaussian_filter,map_coordinates
+from scipy.ndimage import gaussian_filter
 import cv2
-
-import threading
-
-
-
-def difference_of_gaussian(image_obj, sigma=1,k=1.6,white_point=100,sharpness=20):
-    g_k,g_sigma = image_obj,image_obj
-    threads = []
-    # Dispatch threads
-    threads.append(threading.Thread(target=gaussian_filter, args=(image_obj, sigma,0,g_sigma)))
-    threads.append(threading.Thread(target=gaussian_filter, args=(image_obj, k*sigma,0,g_k)))
-
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-    dog = (1+sharpness)*g_sigma - sharpness*g_k
-    dog_threshold = np.where(dog > white_point, 255.0, 0.0)
-
-    return dog_threshold
     
     
-    
-def sobel(image_array,treshold=80):
+def sobel(image_array):
     """Applies Sobel operator for edge detection."""
     
     sobel_x, sobel_y = sobel_components(image_array)
@@ -79,8 +53,8 @@ def hex_to_bgr(value):
     r,g,b = hex_to_rgb(value)
     return b,g,r
 
-def display_image(image):
-    cv2.imshow('aaa', image)
+def display_image(image,title='debug'):
+    cv2.imshow(title, image)
     cv2.waitKey(0)  # Wait for any key press
     cv2.destroyAllWindows()  # Close the window
 
@@ -127,8 +101,8 @@ def edge_normal_blur(image, edge_normals, sigma_e):
     weight_sum = np.zeros_like(image, dtype=np.float32)
     height, width = image.shape
     
-    # Optimize kernel size
-    kernel_size = int(4 * sigma_e + 1)  # Reduced from 6 to 4 for better performance
+    # get gaussian kernal
+    kernel_size = int(4 * sigma_e + 1)
     if kernel_size % 2 == 0:
         kernel_size += 1
     x_kernel = np.linspace(-(kernel_size-1)/2, (kernel_size-1)/2, kernel_size)
@@ -276,34 +250,3 @@ def edge_aligned_blur(image, flow, sigma):
     
     return blurred_image
 
-def flow_dog(image_obj, sigma_c=0.5, sigma_e=0.5, sigma_m=0.6, sigma_a=0.5, k=2, white_point=30, sharpness=2):
-    # Ensure image is float32 and normalized
-    image_obj = image_obj.astype(np.float32) / 255.0
-    
-    # Compute structure tensor and flows
-    img_structure_tensor = structure_tensor(image_obj, sigma_c)
-    edge_tangent_flow, edge_normals = compute_edge_tangent_flow(img_structure_tensor)
-    
-    # Apply edge-normal blurring
-    g_sigma = edge_normal_blur(image_obj, edge_normals, sigma_e)
-    g_k = edge_normal_blur(image_obj, edge_normals, k * sigma_e)
-    
-    # Compute DoG with proper normalization
-    dog = (1+sharpness)*g_sigma - sharpness*g_k
-
-    # Apply edge-aligned blur
-    dog = edge_aligned_blur(dog, edge_tangent_flow, sigma_m)
-    print(dog)
-    # Thresholding with proper scaling
-    white_point_normalized = white_point / 255.0
-    phi = 0.01
-    dog = np.where(
-        dog > white_point_normalized,
-        1.0,
-        1.0 + np.tanh(phi * (dog - white_point_normalized))
-    ).astype(np.uint8)
-    
-    # Final edge-aligned blur for anti-aliasing
-    dog = edge_aligned_blur(dog, edge_tangent_flow, sigma_a)
-    # Convert back to uint8
-    return (255*dog)

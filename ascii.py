@@ -3,7 +3,8 @@ import argparse
 import numpy as np
 import cv2
 from PIL import Image,ImageDraw, ImageFont
-from utils import difference_of_gaussian,sobel, hex_to_bgr, downsample_mode
+from dog import DoGFilter
+from utils import sobel, hex_to_bgr, downsample_mode
 import threading
 import os
 import cv2
@@ -195,7 +196,8 @@ class SpriteASCIIGenerator:
     def process_edges(self,img, results, index):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), cv2.BORDER_DEFAULT)
-        sobel_mag, sobel_dir = sobel(difference_of_gaussian(blurred, white_point=self.settings["white_point"], sharpness=self.settings["sharpness"]))
+        dog_filter = DoGFilter(self.settings);
+        sobel_mag, sobel_dir = sobel(dog_filter.difference_of_gaussian(blurred))
         
         edge_threshold = np.percentile(sobel_mag, self.settings["edge_threshold"])
         
