@@ -1,4 +1,4 @@
-from utils import display_image,structure_tensor,edge_aligned_blur,edge_normal_blur,compute_edge_tangent_flow
+from ..utils.helpers import structure_tensor, edge_aligned_blur, edge_normal_blur, compute_edge_tangent_flow
 
 import numpy as np
 import argparse
@@ -8,25 +8,31 @@ from scipy.ndimage import gaussian_filter
 
 class DoGFilter:
     
-    def __init__(self,settings = {
-        "sigma_c": 0.1,
-        "sigma_e": 0.5,
-        "sigma_m": 1,
-        "sigma_a": 2,
-        "k": 1.4,
-        "phi": 0.01,
-        "white_point": 60,
-        "sharpness": 25,
-    }):
-        self.settings = settings;
+    def __init__(self, settings=None):
+        # Default settings
+        default_settings = {
+            "sigma_c": 0.1,
+            "sigma_e": 0.5,
+            "sigma_m": 1,
+            "sigma_a": 2,
+            "k": 1.4,
+            "phi": 0.01,
+            "white_point": 60,
+            "sharpness": 25,
+        }
+        
+        # Merge provided settings with defaults
+        if settings is None:
+            settings = {}
+        self.settings = {**default_settings, **settings}
     
     def difference_of_gaussian(self,image_obj):
         g_k,g_sigma = image_obj,image_obj
         # settings
-        sigma = self.settings["sigma_e"];
-        sharpness = self.settings["sharpness"];
-        white_point = self.settings["white_point"];
-        k = self.settings["k"];
+        sigma = self.settings["sigma_e"]
+        sharpness = self.settings["sharpness"]
+        white_point = self.settings["white_point"]
+        k = self.settings["k"]
         
         threads = []
         # Dispatch threads
@@ -92,7 +98,7 @@ def main():
     image_path = args.image_path
     
     img = cv2.imread(image_path,cv2.IMREAD_GRAYSCALE)
-    dog_filter = DoGFilter();
+    dog_filter = DoGFilter()
     fdog_image = dog_filter.flow_dog(img)
     dog_image = dog_filter.difference_of_gaussian(img)
     
