@@ -1,0 +1,2 @@
+[console_scripts]
+adhipk-ascii-art = ascii_art.cli:main

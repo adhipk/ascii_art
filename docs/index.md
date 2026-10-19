@@ -25,7 +25,7 @@ pip install -e .
 Generate ASCII art from an image:
 
 ```bash
-ascii-art input.jpg -o output.png
+adhipk-ascii-art input.jpg -o output.png
 ```
 
 ### Programmatic Usage

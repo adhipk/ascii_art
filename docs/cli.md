@@ -1,55 +1,19 @@
-# Command Line Interface
+# Command line interface
 
-The ASCII Art library provides a command-line interface for generating ASCII art from images.
-
-## Usage
-
-```bash
-ascii-art [OPTIONS] IMAGE_PATH
+```sh
+adhipk-ascii-art IMAGE_PATH -o result.png
+adhipk-ascii-art IMAGE_PATH --columns 100 --font-size 12 -o result.png
+adhipk-ascii-art IMAGE_PATH --no-edge -o tones.png
+adhipk-ascii-art IMAGE_PATH --edge-threshold 50 -o edges.png
+adhipk-ascii-art IMAGE_PATH --color --background '#101010' --foreground '#ffffff' -o color.png
+adhipk-ascii-art IMAGE_PATH --text --columns 100 -o output.txt
 ```
 
-## Arguments
+Edges are enabled by default. `--edge-threshold` is a percentile from 0 to 100;
+raising it selects fewer strong edges. `--font-path` accepts a TrueType/OpenType
+font. Without a font path, Pillow supplies its bundled font. `--columns` fixes
+character count while preserving image proportions through measured cell metrics.
+`--foreground` and `--background` accept RGB hex strings. Input/output image
+failures and invalid settings exit with code 2.
 
-- `IMAGE_PATH`: Path to the input image file
-
-## Options
-
-- `-o, --output PATH`: Output file path (default: result.png)
-- `--font-size INTEGER`: Font size for ASCII characters (default: 8)
-- `--use-edge`: Use edge detection in processing
-- `--edge-threshold INTEGER`: Edge detection threshold (default: 90)
-- `-h, --help`: Show help message and exit
-
-## Examples
-
-### Basic Usage
-
-```bash
-ascii-art input.jpg
-```
-
-This will generate ASCII art from `input.jpg` and save it as `result.png`.
-
-### Custom Output Path
-
-```bash
-ascii-art input.jpg -o my_art.png
-```
-
-This will save the ASCII art to `my_art.png`.
-
-### With Edge Detection
-
-```bash
-ascii-art input.jpg --use-edge --edge-threshold 90 -o output.png
-```
-
-This will generate ASCII art with edge detection enabled.
-
-### With Larger Font Size
-
-```bash
-ascii-art input.jpg --font-size 12 -o large_output.png
-```
-
-This will generate ASCII art with a larger font size.
+Run `adhipk-ascii-art --help` for the complete argument list.

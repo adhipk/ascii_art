@@ -1,0 +1,10 @@
+{
+  "name": "ascii-art-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun build.ts && bun test .",
+    "start": "bun build.ts && bun serve.ts"
+  }
+}

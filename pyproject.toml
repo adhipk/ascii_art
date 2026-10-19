@@ -1,13 +1,13 @@
 [project]
-name = "ascii-art"
+name = "adhipk-ascii-art"
 version = "0.1.0"
 description = "A Python library for generating ASCII art from images with advanced filtering capabilities"
-readme = "README.md"
+readme = "readme.md"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.21.0",
     "opencv-python>=4.5.0",
-    "pillow>=8.0.0",
+    "pillow>=10.1.0",
     "scipy>=1.7.0",
 ]
 classifiers = [
@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 [project.scripts]
-ascii-art = "ascii_art.cli:main"
+adhipk-ascii-art = "ascii_art.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/adhipkashyap/ascii-art"
@@ -29,7 +29,7 @@ Repository = "https://github.com/adhipkashyap/ascii-art"
 Documentation = "https://github.com/adhipkashyap/ascii-art#readme"
 
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -37,3 +37,10 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "black>=24"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -102,23 +102,23 @@ cv2.imwrite("dog_filtered.png", filtered_img)
 ### Basic Usage
 
 ```bash
-ascii-art input.jpg
+adhipk-ascii-art input.jpg
 ```
 
 ### With Custom Output
 
 ```bash
-ascii-art input.jpg -o my_ascii_art.png
+adhipk-ascii-art input.jpg -o my_ascii_art.png
 ```
 
 ### With Edge Detection
 
 ```bash
-ascii-art input.jpg --use-edge --edge-threshold 90 -o output.png
+adhipk-ascii-art input.jpg --edge-threshold 70 -o output.png
 ```
 
 ### With Custom Font Size
 
 ```bash
-ascii-art input.jpg --font-size 12 -o large_font_output.png
+adhipk-ascii-art input.jpg --font-size 12 -o large_font_output.png
 ```

@@ -1,0 +1,3 @@
+(A) 2026-10-18 Implement font-aware Unicode shape matching and consistent text exports +ascii_art @codex id:591f32e0-62ce-4de7-b5b6-51e83bf5af45 owner:codex repo:/Users/adhipkashyap/Documents/Projects/ascii_art
+x 2026-10-18 2026-10-18 Audit Acerola pipeline and implement tested Python reference edge pass +ascii_art @codex id:941e3cd8-efdf-4a57-82ea-17a208d3d6da owner:codex repo:/Users/adhipkashyap/Documents/Projects/ascii_art
+x 2026-10-18 2026-10-18 Add adaptive 8x8 16x16 32x32 text rendering +ascii_art @codex id:8eae4362-9b0b-4a35-83cf-9634afcf6112 owner:codex repo:/Users/adhipkashyap/Documents/Projects/ascii_art

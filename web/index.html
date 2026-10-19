@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A live ASCII image filter. Adjust your image privately in the browser.">
+  <title>ASCII studio</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>ASCII studio</h1>
+    <div class="header-actions">
+      <button id="choose" class="primary" type="button">Choose image</button>
+      <input id="file" type="file" accept="image/*" hidden>
+      <button id="sample" type="button">Try sample</button>
+      <span class="action-divider" aria-hidden="true"></span>
+      <button id="png" type="button" disabled>Download PNG</button>
+      <button id="text" type="button" disabled>Text</button>
+    </div>
+  </header>
+  <main class="workspace">
+    <section class="image-workspace" aria-label="Image preview">
+      <div class="viewer-toolbar">
+        <div class="segmented" role="group" aria-label="Preview image">
+          <button id="view-ascii" type="button" aria-pressed="true">ASCII</button>
+          <button id="view-original" type="button" aria-pressed="false">Original</button>
+        </div>
+        <div class="segmented zoom" role="group" aria-label="Image scale">
+          <button id="fit" type="button" aria-pressed="true">Fit</button>
+          <button id="actual" type="button" aria-pressed="false">100%</button>
+        </div>
+      </div>
+      <div id="stage" class="stage" tabindex="0" aria-label="Image preview. Drop an image here to replace it.">
+        <img id="original" alt="Original image" hidden>
+        <div id="output" class="ascii-text" role="img" aria-label="ASCII art preview rendered as text" hidden></div>
+        <div id="empty" class="empty"><p>Your image, in characters.</p><span>Choose an image or try the sample.</span></div>
+        <div id="drop-hint" aria-hidden="true">Drop image to replace</div>
+      </div>
+      <div class="viewer-footer">
+        <span id="filename">No image selected</span>
+        <span id="dimensions"></span>
+        <span id="status" role="status" aria-live="polite">Choose an image to start</span>
+        <button id="cancel" class="text-button" type="button" hidden>Cancel</button>
+        <button id="retry" class="text-button" type="button" hidden>Retry</button>
+      </div>
+    </section>
+    <aside class="inspector" aria-labelledby="adjustments-heading">
+      <div class="inspector-heading"><h2 id="adjustments-heading">Adjustments</h2><button id="reset" class="text-button" type="button">Reset</button></div>
+      <p class="hint">Changes update automatically.</p>
+      <section class="examples" aria-labelledby="examples-heading">
+        <h3 id="examples-heading">Examples</h3>
+        <div id="examples" class="example-list"></div>
+      </section>
+      <form id="controls">
+        <fieldset>
+          <legend class="sr-only">Character grid</legend>
+          <label class="select-label" for="layout">Layout <select id="layout"><option value="fixed" selected>Fixed grid</option><option value="adaptive">Adaptive · 8 / 16 / 32 px</option></select></label>
+          <p class="control-help">Adaptive cells get smaller around edges and detail. PNG keeps mixed sizes; text uses a fixed grid.</p>
+          <label class="range-label" for="columns">Columns <output id="columns-value" for="columns">100</output></label>
+          <input id="columns" type="range" min="20" max="180" step="1" value="100">
+          <label class="select-label" for="font-size">Font size <select id="font-size"><option value="8">8 px</option><option value="12" selected>12 px</option><option value="16">16 px</option><option value="20">20 px</option></select></label>
+        </fieldset>
+        <fieldset>
+          <legend class="sr-only">Edge settings</legend>
+          <label class="check" for="edges"><span>Contour emphasis</span><input id="edges" type="checkbox"></label>
+          <label class="select-label edge-method" for="edge-method">Detector
+            <select id="edge-method"><option value="acerola" selected>Acerola · DoG + direction vote</option><option value="tiny">PiDiNet Tiny · tonal emphasis</option><option value="dog">XDoG · tonal emphasis</option></select>
+          </label>
+          <p id="edge-help" class="control-help">Gently enhances existing shading. First use downloads the edge model.</p>
+          <div id="reference-edge-controls">
+            <p class="control-help">Thresholded DoG, then a direction vote over each 8×8 analysis tile. Winning edges replace shading characters.</p>
+            <label class="range-label secondary" for="edge-min-pixels">Minimum edge votes <output id="edge-min-value" for="edge-min-pixels">8</output></label>
+            <input id="edge-min-pixels" type="range" min="1" max="64" step="1" value="8">
+            <div class="range-hints" aria-hidden="true"><span>More edges</span><span>Fewer edges</span></div>
+          </div>
+          <div id="tonal-edge-controls" hidden>
+          <label class="range-label secondary" for="edge-amount">Contour strength <output id="edge-value" for="edge-amount">20</output></label>
+          <input id="edge-amount" type="range" min="0" max="100" step="1" value="20">
+          <div class="range-hints" aria-hidden="true"><span>Off</span><span>Subtle contrast</span></div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="sr-only">Color settings</legend>
+          <label class="check" for="color"><span>Color</span><input id="color" type="checkbox"></label>
+          <label class="select-label background-mode" for="background-mode">Background
+            <select id="background-mode"><option value="source" selected>From image · gradient</option><option value="solid">Solid color</option></select>
+          </label>
+          <p id="background-help" class="control-help">A soft gradient from your image’s colors.</p>
+          <label id="solid-background" class="select-label" for="background" hidden>Paper color <input id="background" type="color" value="#ffffff"></label>
+        </fieldset>
+      </form>
+      <p class="privacy">Processed on your device.</p>
+      <p id="runtime-note" class="runtime-note">The first render downloads the Python runtime. This can take a minute.</p>
+    </aside>
+  </main>
+  <noscript>This converter needs JavaScript and WebAssembly enabled.</noscript>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

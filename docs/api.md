@@ -1,129 +1,37 @@
-# API Reference
-
-## Main Modules
-
-### ascii_art
-
-Main package module.
-
-#### Classes
-
-##### SpriteASCIIGenerator
-
-Main class for generating ASCII art using sprite-based approach.
+# API reference
 
 ```python
-from ascii_art import SpriteASCIIGenerator
+from ascii_art import SpriteASCIIGenerator, DoGFilter, generate_ascii_image_sprite
 ```
 
-**Methods:**
+`SpriteASCIIGenerator(settings=None)` builds a reusable, font-calibrated renderer.
+See the [settings table](../readme.md#settings) for defaults and parameter units.
 
-- `__init__(self, settings: Dict[str, Any])`: Initialize the generator with settings
-  - `settings`: Configuration dictionary with the following keys:
-    - `use_edge` (bool): Enable edge detection (default: False)
-    - `edge_threshold` (int): Edge detection threshold (default: 90)
-    - `font_size` (int): Font size for characters (default: 8)
-    - `sharpness` (int): Image sharpness (default: 100)
-    - `white_point` (int): White point threshold (default: 2)
+- `generate_ascii(image) -> np.ndarray`: return an antialiased BGR uint8 image.
+- `generate_grid(image) -> dict`: return text, per-cell RGB colors, paper rows,
+  and grid geometry. Optional browser `text_metrics` bypasses Pillow masks.
+- `generate_text(image) -> str`: return the same character grid as plain ASCII.
+- `generate_ascii_and_text(image) -> tuple[np.ndarray, str]`: generate both exports with one resampling/filtering pass.
+- `generate_ascii_image_sprite(image, settings=None)`: convenience image conversion.
 
-- `generate_ascii(self, img: np.ndarray) -> np.ndarray`: Generate ASCII art from an image
-  - `img`: Input image as numpy array
-  - Returns: ASCII art image as numpy array
+Inputs are nonempty HxW grayscale, HxWx3 BGR, or HxWx4 BGRA arrays, as uint8
+or finite normalized floating point in [0, 1]. Alpha is ignored; composite first
+if needed. Unsupported shapes, dtypes and settings raise `ValueError`. Input
+arrays are never mutated. The default font works independently of the current
+working directory. Output dimensions are multiples of the measured cell size.
 
-##### DoGFilter
+`DoGFilter(settings=None)` exposes:
 
-Difference of Gaussians filter for edge detection.
+- `response(image)`: signed float32 extended DoG response, before thresholding.
+- `difference_of_gaussian(image)`: soft-thresholded uint8 XDoG line image.
+- `flow_dog(image)`: uint8 lines filtered across edge normals and along tangents.
 
-```python
-from ascii_art import DoGFilter
-```
+The [README](../readme.md) describes filtering formulas, scales and thresholds.
+Optional `edge_map` settings accept a normalized 2D confidence map and bypass
+DoG edge extraction. `edge_sensitivity` enables confidence-based hysteresis
+instead of percentile ranking. Set `edge_amount` from 0 to 100 for bounded tonal
+emphasis instead of substituting line glyphs; zero skips edge processing. `background_mode="source"` selects palette-derived gradient
+paper with automatic monochrome ink polarity. Solid paper remains the default.
 
-**Methods:**
-
-- `__init__(self, settings: Dict[str, Any])`: Initialize the filter with settings
-  - `settings`: Configuration dictionary with the following keys:
-    - `sigma_c` (float): Structure tensor sigma (default: 0.1)
-    - `sigma_e` (float): Edge sigma (default: 0.5)
-    - `sigma_m` (float): Median sigma (default: 1)
-    - `sigma_a` (float): Anti-aliasing sigma (default: 2)
-    - `k` (float): DoG multiplier (default: 1.4)
-    - `phi` (float): Flow DoG parameter (default: 0.01)
-    - `white_point` (int): White point threshold (default: 60)
-    - `sharpness` (int): Sharpness factor (default: 25)
-
-- `difference_of_gaussian(self, image_obj)`: Apply DoG filter to an image
-- `flow_dog(self, image_obj)`: Apply flow-based DoG filtering
-
-#### Functions
-
-##### generate_ascii_image_sprite
-
-Convenience function to generate colored ASCII art.
-
-```python
-from ascii_art import generate_ascii_image_sprite
-```
-
-**Parameters:**
-- `img`: Input image as numpy array
-- `settings`: Configuration dictionary
-
-**Returns:**
-- ASCII art image as numpy array
-
-### ascii_art.generators
-
-Module containing different approaches for generating ASCII art from images.
-
-### ascii_art.filters
-
-Module containing various image filters that can be used to preprocess images before converting them to ASCII art.
-
-### ascii_art.utils
-
-Module containing various utility functions used throughout the ASCII art library.
-
-#### Functions
-
-##### sobel
-
-Applies Sobel operator for edge detection.
-
-```python
-from ascii_art.utils import sobel
-```
-
-**Parameters:**
-- `image_array`: Input image as numpy array
-
-**Returns:**
-- Tuple of (magnitude, direction) arrays
-
-##### hex_to_bgr
-
-Convert hex color to BGR tuple.
-
-```python
-from ascii_art.utils import hex_to_bgr
-```
-
-**Parameters:**
-- `value`: Hex color string (e.g., "#FFFFFF")
-
-**Returns:**
-- BGR tuple (blue, green, red)
-
-##### downsample_mode
-
-Downsample image using mode filtering.
-
-```python
-from ascii_art.utils import downsample_mode
-```
-
-**Parameters:**
-- `img`: Input image as numpy array
-- `kernel_size`: Size of downsampling kernel
-
-**Returns:**
-- Downsampled image as numpy array
+Legacy utility exports `sobel`, `hex_to_bgr`, and `downsample_mode` remain available;
+the new renderer uses OpenCV derivatives and pooled tensors instead.

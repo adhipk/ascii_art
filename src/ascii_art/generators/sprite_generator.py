@@ -1,238 +1,440 @@
+"""Vectorized, font-calibrated ASCII rendering with DoG-guided edge glyphs."""
+from functools import lru_cache
+from math import ceil
+from typing import Any, Mapping
 
-from typing import Dict, Any, Optional, Tuple, List
-import argparse
-import numpy as np
 import cv2
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from ..filters.dog_filter import DoGFilter
-from ..utils.helpers import sobel, hex_to_bgr, downsample_mode
-import threading
-import os
-import hashlib
+
+from ascii_art.filters.dog_filter import DoGFilter, blur, gradient, grayscale
+from ascii_art.filters.edge_selection import select_edges
+from ascii_art.filters.acerola import edge_pass
+from ascii_art.utils.background import gradient_rows, source_palette
+from ascii_art.utils.color import readable_ink
+
+
+@lru_cache(maxsize=32)
+def glyph_atlas(
+    font_path: str | None, size: int, chars: str
+) -> tuple[np.ndarray, int, int]:
+    """Cache by all rasterization inputs, in memory; never write into installation."""
+    font = (
+        ImageFont.truetype(font_path, size)
+        if font_path
+        else ImageFont.load_default(size=size)
+    )
+    bounds = [font.getbbox(char) for char in chars]
+    width = max(1, ceil(max(font.getlength(char) for char in chars)))
+    top = min(0, min(b[1] for b in bounds))
+    height = max(size, max(b[3] for b in bounds) - top)
+    atlas = []
+    for char in chars:
+        tile = Image.new("L", (width, height))
+        ImageDraw.Draw(tile).text((0, -top), char, font=font, fill=255)
+        atlas.append(np.asarray(tile, dtype=np.float32) / 255)
+    masks = np.stack(atlas)
+    masks.setflags(write=False)
+    return masks, width, height
+
+
+def color(value: str) -> np.ndarray:
+    """Parse an RGB hex color into OpenCV BGR."""
+    if not isinstance(value, str) or len(value) != 7 or not value.startswith("#"):
+        raise ValueError("colors must be #RRGGBB strings")
+    try:
+        return np.array(
+            [int(value[i : i + 2], 16) for i in (5, 3, 1)], dtype=np.float32
+        )
+    except ValueError as exc:
+        raise ValueError("colors must be #RRGGBB strings") from exc
+
 
 class SpriteASCIIGenerator:
-    def __init__(self, settings: Dict[str, Any] = None):
-        # Default settings
-        default_settings = {
-            "use_edge": False,
-            "edge_threshold": 90,
+    """Accept BGR/BGRA uint8 or normalized floats; return a BGR uint8 image.
+
+    Character cell dimensions come from the selected font. Edge thresholds are
+    percentiles (0–100); larger values select fewer edge cells.
+    """
+
+    def __init__(self, settings: Mapping[str, Any] | None = None) -> None:
+        self.settings = {
+            "use_edge": True,
+            "edge_threshold": 70.0,
+            "edge_sensitivity": None,
+            "edge_amount": None,
+            "edge_method": "tensor",
+            "edge_min_pixels": 8,
             "use_color": False,
-            "font_size": 8,
-            "sharpness": 100,
-            "white_point": 2,
+            "font_size": 12,
+            "font_path": None,
+            "text_metrics": None,
+            "characters": " .:-=+*#%@",
+            "foreground": "#242424",
+            "background": "#FFFFFF",
+            "background_mode": "solid",
+            "background_stops": None,
+            "columns": None,
+            "edge_coherence": 0.3,
+            "edge_strength": 0.01,
+            "edge_map": None,
+            "sigma_e": 1.0,
+            "k": 1.6,
+            "sharpness": 5.0,
+            "white_point": 128,
+            **(settings or {}),
         }
-        
-        # Merge provided settings with defaults
-        if settings is None:
-            settings = {}
-        self.settings = {**default_settings, **settings}
-        
-        self.grid_size = self.settings['font_size']
-        ascii_chars = "@%#*+:. "
-        edge_chars = "-/|\\"
-        self.num_ascii_chars = len(ascii_chars)
-        self.num_edge_chars = len(edge_chars)
-        self.colors = ["#242424", "#FFFFFF"]
+        s = self.settings
+        if (
+            isinstance(s["font_size"], bool)
+            or not isinstance(s["font_size"], int)
+            or s["font_size"] < 2
+        ):
+            raise ValueError("font_size must be an integer >= 2")
+        if s["columns"] is not None and (
+            isinstance(s["columns"], bool)
+            or not isinstance(s["columns"], int)
+            or s["columns"] < 1
+        ):
+            raise ValueError("columns must be a positive integer")
+        for name, upper in (
+            ("edge_threshold", 100),
+            ("edge_coherence", 1),
+            ("edge_strength", 1),
+        ):
+            if not np.isfinite(s[name]) or not 0 <= s[name] <= upper:
+                raise ValueError(f"{name} must be in [0, {upper}]")
+        if s["edge_sensitivity"] is not None and (
+            not isinstance(s["edge_sensitivity"], (int, float))
+            or not np.isfinite(s["edge_sensitivity"])
+            or not 0 <= s["edge_sensitivity"] <= 100
+        ):
+            raise ValueError("edge_sensitivity must be in [0, 100]")
+        if s["edge_amount"] is not None and (
+            not isinstance(s["edge_amount"], (int, float))
+            or not np.isfinite(s["edge_amount"])
+            or not 0 <= s["edge_amount"] <= 100
+        ):
+            raise ValueError("edge_amount must be in [0, 100]")
+        if s["background_mode"] not in ("solid", "source"):
+            raise ValueError("background_mode must be solid or source")
+        self.background_stops = None
+        if s["background_stops"] is not None:
+            stops = np.asarray(s["background_stops"], dtype=np.float32)
+            if (
+                stops.shape != (2, 3)
+                or not np.isfinite(stops).all()
+                or stops.min() < 0
+                or stops.max() > 255
+            ):
+                raise ValueError("background_stops must be two BGR colors in [0, 255]")
+            self.background_stops = stops.copy()
+        chars = s["characters"]
+        if (
+            not isinstance(chars, str)
+            or len(set(chars)) < 2
+            or not all(c.isprintable() and c.isascii() for c in chars)
+        ):
+            raise ValueError(
+                "characters must contain at least two distinct printable ASCII characters"
+            )
+        self.edge_map = None
+        if s["edge_map"] is not None:
+            edge_map = np.asarray(s["edge_map"], dtype=np.float32)
+            if (
+                edge_map.ndim != 2
+                or edge_map.size == 0
+                or not np.isfinite(edge_map).all()
+                or edge_map.min() < 0
+                or edge_map.max() > 1
+            ):
+                raise ValueError(
+                    "edge_map must contain finite confidence values in [0, 1]"
+                )
+            self.edge_map = edge_map.copy()
+        self.characters = "".join(dict.fromkeys(chars))
+        self.edge_characters = "-/|\\"
+        self.num_ascii_chars = len(self.characters)
+        self.num_edge_chars = 4
+        metrics = s["text_metrics"]
+        if metrics is None:
+            self.char_masks, self.char_width, self.grid_size = glyph_atlas(
+                s["font_path"], s["font_size"], self.characters + self.edge_characters
+            )
+            densities = self.char_masks[: self.num_ascii_chars].mean(axis=(1, 2))
+        else:
+            if not isinstance(metrics, Mapping):
+                raise ValueError("text_metrics must be a mapping")
+            width, height = metrics.get("width"), metrics.get("height")
+            densities = np.asarray(metrics.get("densities"), dtype=np.float32)
+            if (
+                not isinstance(width, int)
+                or not isinstance(height, int)
+                or not 1 <= width <= 64
+                or not 2 <= height <= 96
+                or densities.shape != (self.num_ascii_chars,)
+                or not np.isfinite(densities).all()
+                or densities.min() < 0
+                or densities.max() > 1
+                or np.ptp(densities) <= 1e-8
+            ):
+                raise ValueError("Invalid browser text metrics")
+            self.char_masks = None
+            self.char_width, self.grid_size = width, height
+        self.foreground, self.background = color(s["foreground"]), color(
+            s["background"]
+        )
+        self._density_order = np.argsort(densities, kind="stable")
+        ordered = densities[self._density_order]
+        self._densities = (ordered - ordered.min()) / max(float(np.ptp(ordered)), 1e-8)
+        self.dog = DoGFilter(s)
 
-        # Cache font
-        self.font = ImageFont.truetype(font="fonts/dogica.ttf", size=self.grid_size)
+    def _prepare(self, image: np.ndarray) -> tuple[np.ndarray, np.ndarray, int, int]:
+        gray = grayscale(image)
+        h, w = gray.shape
+        cols = self.settings["columns"] or max(1, w // self.char_width)
+        rows = max(1, round(h / w * cols * self.char_width / self.grid_size))
+        target = (cols * self.char_width, rows * self.grid_size)
+        analysis_target = (
+            (cols * 8, rows * 8)
+            if self.settings["edge_method"] == "acerola"
+            else target
+        )
+        gray = cv2.resize(gray, analysis_target, interpolation=cv2.INTER_AREA)
+        source = image.astype(np.float32)
+        if image.dtype == np.uint8:
+            source /= 255
+        if source.ndim == 2:
+            source = cv2.cvtColor(source, cv2.COLOR_GRAY2BGR)
+        source = cv2.resize(source[..., :3], target, interpolation=cv2.INTER_AREA)
+        return gray, source, rows, cols
 
-        # Generate and cache sprite sheet
-        self.char_sprite_sheet, self.char_width = self._generate_cached_sprite_sheet(ascii_chars + edge_chars)
+    def _cells(self, values: np.ndarray, rows: int, cols: int) -> np.ndarray:
+        return values.reshape(rows, self.grid_size, cols, self.char_width).mean(
+            axis=(1, 3)
+        )
 
-        # Pre-compute character masks
-        self.char_masks = self._precompute_cached_char_masks(self.char_sprite_sheet, len(ascii_chars + edge_chars))
+    def _paper(self, source: np.ndarray) -> np.ndarray:
+        if self.settings["background_mode"] == "solid":
+            return self.background
+        stops = (
+            self.background_stops
+            if self.background_stops is not None
+            else source_palette(source)
+        )
+        return gradient_rows(stops, source.shape[0])
 
-    def _generate_cached_sprite_sheet(self, chars: str) -> Tuple[np.ndarray, int]:
-        """
-        Generate or load cached sprite sheet for characters.
-        
-        Args:
-            chars (str): String of characters to include in sprite sheet
-        
-        Returns:
-            tuple: (sprite_sheet, char_width)
-        """
-        cache_dir = os.path.join(os.path.dirname(__file__), 'assets')
-        os.makedirs(cache_dir, exist_ok=True)
+    def _ink(self, paper: np.ndarray) -> np.ndarray:
+        if self.settings["background_mode"] == "solid":
+            return self.foreground
+        return np.full(3, 255 if paper.mean() < 128 else 36, np.float32)
 
-        chars_hash = hashlib.md5(chars.encode()).hexdigest()
-        cache_file = os.path.join(cache_dir, f'sprite_sheet_{chars_hash}.npz')
+    def _indices(
+        self, gray: np.ndarray, rows: int, cols: int, paper: np.ndarray | None = None
+    ) -> np.ndarray:
+        reference = self.settings["edge_method"] == "acerola"
+        luminance = (
+            gray.reshape(rows, 8, cols, 8).mean(axis=(1, 3))
+            if reference
+            else self._cells(gray, rows, cols)
+        )
+        paper = self.background if paper is None else paper
+        ink = self._ink(paper)
+        fg = float(ink @ np.array([0.114, 0.587, 0.299]) / 255)
+        bg = paper @ np.array([0.114, 0.587, 0.299]) / 255
+        if paper.ndim == 3:
+            bg = bg.reshape(rows, self.grid_size, 1).mean(axis=1)
+        delta = fg - bg
+        coverage = np.clip(
+            (luminance - bg) / np.where(np.abs(delta) > 1e-6, delta, 1), 0, 1
+        )
+        indices = self._density_order[
+            np.abs(coverage[..., None] - self._densities).argmin(axis=-1)
+        ]
+        sensitivity = self.settings["edge_sensitivity"]
+        amount = self.settings["edge_amount"]
+        if (
+            self.settings["use_edge"]
+            and amount != 0
+            and self.settings["edge_method"] == "acerola"
+        ):
+            # Reference pipeline: threshold DoG first, then vote per pixel.
+            # This deliberately bypasses tensor pooling and tonal emphasis.
+            winners = edge_pass(gray, rows, cols, self.settings)["tiles"]
+            retained = winners >= 0
+            lookup = np.array([2, 0, 3, 1])  # |, -, backslash, slash
+            indices[retained] = self.num_ascii_chars + lookup[winners[retained]]
+            return indices
+        if self.settings["use_edge"] and sensitivity != 0 and amount != 0:
+            # Differentiate smooth, unthresholded XDoG to avoid binary contour noise.
+            confidence = None
+            if self.edge_map is not None:
+                confidence = cv2.resize(
+                    self.edge_map,
+                    (gray.shape[1], gray.shape[0]),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                gx, gy = gradient(blur(gray, 0.7))
+                gx, gy = gx * confidence, gy * confidence
+            else:
+                gx, gy = gradient(blur(self.dog.response(gray), 0.7))
+            xx, xy, yy = (
+                self._cells(v, rows, cols) for v in (gx * gx, gx * gy, gy * gy)
+            )
+            energy = xx + yy
+            coherence = np.sqrt((xx - yy) ** 2 + 4 * xy * xy) / np.maximum(
+                energy, 1e-10
+            )
+            strength = np.sqrt(energy)
+            if confidence is not None:
+                strength = confidence.reshape(
+                    rows, self.grid_size, cols, self.char_width
+                ).max(axis=(1, 3))
+            valid = (strength > self.settings["edge_strength"]) & (
+                coherence >= self.settings["edge_coherence"]
+            )
+            if sensitivity is not None:
+                if confidence is not None:
+                    # Select at the model's native resolution, independent of the
+                    # current font/grid. Then project retained contours to cells.
+                    retained = select_edges(self.edge_map, sensitivity)
+                    retained = cv2.resize(
+                        retained.astype(np.uint8),
+                        (gray.shape[1], gray.shape[0]),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+                    mask = (
+                        retained.reshape(rows, self.grid_size, cols, self.char_width)
+                        .max(axis=(1, 3))
+                        .astype(bool)
+                        & valid
+                    )
+                else:
+                    # Fixed derivative scale; never normalize by each image's max.
+                    mask = select_edges(
+                        np.clip(strength / 0.15, 0, 1),
+                        sensitivity,
+                        eligible=valid,
+                        min_size=2,
+                    )
+            else:
+                # Preserve legacy percentile settings for existing Python callers.
+                candidates = strength > self.settings["edge_strength"]
+                threshold = (
+                    np.percentile(strength[candidates], self.settings["edge_threshold"])
+                    if np.any(candidates)
+                    else np.inf
+                )
+                mask = valid & (strength >= threshold)
+            if amount is not None:
+                # Gentle local contrast within the density ramp. Never substitute
+                # orientation glyphs: they destroy the underlying image's tone.
+                detail = luminance - cv2.GaussianBlur(luminance, (0, 0), 1.0)
+                weight = (
+                    strength
+                    if confidence is not None
+                    else np.clip(strength / 0.15, 0, 1)
+                )
+                boost = (
+                    np.clip(detail * 0.75, -0.08, 0.08) * (amount / 100) * weight * mask
+                )
+                adjusted = np.clip(coverage + np.sign(delta) * boost, 0, 1)
+                return self._density_order[
+                    np.abs(adjusted[..., None] - self._densities).argmin(axis=-1)
+                ]
+            if np.any(mask):
+                # Tensor angle is a normal. Rotate to tangent; image y points down.
+                tangent = (0.5 * np.arctan2(2 * xy, xx - yy) + np.pi / 2) % np.pi
+                bins = np.floor(tangent / (np.pi / 4) + 0.5).astype(int) % 4
+                edge_lookup = np.array([0, 3, 2, 1])  # -, backslash, |, slash
+                indices[mask] = self.num_ascii_chars + edge_lookup[bins[mask]]
+        return indices
 
-        if os.path.exists(cache_file):
-            try:
-                cached_data = np.load(cache_file)
-                sprite_sheet = cached_data['sprite_sheet']
-                char_width = int(cached_data['char_width'])
-                return sprite_sheet, char_width
-            except Exception as e:
-                print(f"Error loading cached sprite sheet: {e}")
+    def _text_from_indices(self, indices: np.ndarray) -> str:
+        chars = np.array(list(self.characters + self.edge_characters))
+        return "\n".join("".join(row) for row in chars[indices])
 
-        sprite_sheet, char_width = self._generate_sprite_sheet(chars)
-
-        try:
-            np.savez_compressed(cache_file, sprite_sheet=sprite_sheet, char_width=char_width)
-            print(f"Cached sprite sheet to: {cache_file}")
-        except Exception as e:
-            print(f"Error caching sprite sheet: {e}")
-
-        return sprite_sheet, char_width
-
-    def _precompute_cached_char_masks(self, sprite_sheet: np.ndarray, num_chars: int) -> List[np.ndarray]:
-        """
-        Generate or load cached character masks.
-        
-        Args:
-            sprite_sheet (np.ndarray): Sprite sheet image
-            num_chars (int): Number of characters to process
-        
-        Returns:
-            list: List of boolean masks for each character
-        """
-        cache_dir = os.path.join(os.path.dirname(__file__), 'assets')
-        os.makedirs(cache_dir, exist_ok=True)
-
-        sheet_hash = hashlib.md5(sprite_sheet.tobytes()).hexdigest()
-        cache_file = os.path.join(cache_dir, f'char_masks_{sheet_hash}.npz')
-
-        if os.path.exists(cache_file):
-            try:
-                cached_data = np.load(cache_file)
-                char_masks = np.array([cached_data[f'mask_{i}'] for i in range(num_chars)])
-                return char_masks
-            except Exception as e:
-                print(f"Error loading cached character masks: {e}")
-
-        char_masks = self._precompute_char_masks(sprite_sheet, num_chars)
-
-        try:
-            mask_dict = {f'mask_{i}': mask for i, mask in enumerate(char_masks)}
-            np.savez_compressed(cache_file, **mask_dict)
-            print(f"Cached character masks to: {cache_file}")
-        except Exception as e:
-            print(f"Error caching character masks: {e}")
-
-        return char_masks
-
-    def _generate_sprite_sheet(self, char_list: str) -> Tuple[np.ndarray, int]:
-        """Generate a sprite sheet containing all ASCII characters"""
-        num_chars = len(char_list)
-        temp_img = Image.new('RGB', (self.grid_size * 2, self.grid_size), 'white')
-        temp_draw = ImageDraw.Draw(temp_img)
-        char_width = temp_draw.textlength("@", font=self.font)
-
-        sheet_width = int(char_width * num_chars)
-        sprite_img = Image.new('RGB', (sheet_width, self.grid_size), 'white')
-        sprite_draw = ImageDraw.Draw(sprite_img)
-
-        for i, char in enumerate(char_list):
-            sprite_draw.text((i * char_width, 0), char, fill='black', font=self.font)
-
-        sprite_sheet = cv2.cvtColor(np.array(sprite_img), cv2.COLOR_RGB2GRAY)
-        sprite_sheet = (sprite_sheet < 128).astype(np.uint8) * 255
-
-        return sprite_sheet, int(char_width)
-
-    def _precompute_char_masks(self, sprite_sheet: np.ndarray, num_chars: int) -> List[np.ndarray]:
-        """Pre-compute binary masks for all characters"""
-        masks = []
-        for i in range(num_chars):
-            sprite_x = int(i * self.char_width)
-            char_sprite = sprite_sheet[:, sprite_x:sprite_x + self.char_width]
-            masks.append(char_sprite > 0)
-        return masks
-
-    def _paste_characters(self, output_img: np.ndarray, char_indices: np.ndarray) -> None:
-        """
-        Paste char masks into output image
-        
-        Args:
-            output_img: Target image array (modified in-place)
-            char_indices: 2D array of character indices
-        """
-        height, width = char_indices.shape
-        new_height, new_width = height * self.grid_size, width * self.char_width
-
-        char_mask = self.char_masks[char_indices]
-        char_mask = char_mask.transpose(0, 2, 1, 3).reshape(new_height, new_width)
-        bg_color = hex_to_bgr(self.colors[0])
-        output_img[char_mask] = bg_color
-
-    def process_brightness(self, img: np.ndarray, new_width: int, new_height: int, results: List[Any], index: int) -> None:
-        resized_gray = cv2.cvtColor(cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
-        char_indices = np.multiply(resized_gray, self.num_ascii_chars / 256, dtype=np.float32).astype(np.int32)
-        char_indices = np.clip(char_indices, 0, self.num_ascii_chars - 1)
-        results[index] = char_indices
-
-    def process_edges(self, img: np.ndarray, results: List[Any], index: int) -> None:
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), cv2.BORDER_DEFAULT)
-        dog_filter = DoGFilter()
-        sobel_mag, sobel_dir = sobel(dog_filter.difference_of_gaussian(blurred))
-
-        edge_threshold = np.percentile(sobel_mag, self.settings["edge_threshold"])
-
-        sobel_mag_down = downsample_mode(sobel_mag, self.grid_size)
-        edge_mask = sobel_mag_down > edge_threshold
-        sobel_dir_down = downsample_mode((sobel_dir // (np.pi / 4)) % self.num_edge_chars, self.grid_size).astype(np.uint8)
-
-        edge_indices = self.num_ascii_chars + sobel_dir_down[edge_mask]
-        results[index] = (edge_mask, edge_indices)
+    def generate_text(self, img: np.ndarray) -> str:
+        """Return the same character grid used by the image renderer."""
+        gray, source, rows, cols = self._prepare(img)
+        return self._text_from_indices(
+            self._indices(gray, rows, cols, self._paper(source))
+        )
 
     def generate_ascii(self, img: np.ndarray) -> np.ndarray:
-        results = [None, None]
-        threads = []
-        height, width = img.shape[:2]
-        new_width = width // self.grid_size
-        new_height = height // self.grid_size
+        gray, source, rows, cols = self._prepare(img)
+        paper = self._paper(source)
+        return self._rasterize(self._indices(gray, rows, cols, paper), source, paper)
 
-        threads.append(threading.Thread(target=self.process_brightness, args=(img, new_width, new_height, results, 0)))
-        if self.settings['use_edge']:
-            threads.append(threading.Thread(target=self.process_edges, args=(img, results, 1)))
+    def generate_ascii_and_text(self, img: np.ndarray) -> tuple[np.ndarray, str]:
+        """Generate both exports with a single resampling and filtering pass."""
+        gray, source, rows, cols = self._prepare(img)
+        paper = self._paper(source)
+        indices = self._indices(gray, rows, cols, paper)
+        return self._rasterize(indices, source, paper), self._text_from_indices(indices)
 
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+    def _rasterize(
+        self, indices: np.ndarray, source: np.ndarray, paper: np.ndarray
+    ) -> np.ndarray:
+        if self.char_masks is None:
+            raise ValueError(
+                "Browser text metrics require generate_grid, not mask rendering"
+            )
+        rows, cols = indices.shape
+        alpha = (
+            self.char_masks[indices]
+            .transpose(0, 2, 1, 3)
+            .reshape(source.shape[:2])[..., None]
+        )
+        foreground = self._ink(paper)
+        if self.settings["use_color"]:
+            cell_colors = self._cell_colors(source, paper, indices)
+            foreground = np.repeat(
+                np.repeat(cell_colors, self.grid_size, axis=0), self.char_width, axis=1
+            )
+        return np.rint(alpha * foreground + (1 - alpha) * paper).astype(np.uint8)
 
-        brightness_indices = results[0]
-        combined_indices = brightness_indices.copy()
-        if results[1] is not None:
-            edge_mask, edge_indices = results[1]
-            combined_indices[edge_mask] = edge_indices
+    def _cell_colors(
+        self, source: np.ndarray, paper: np.ndarray, indices: np.ndarray
+    ) -> np.ndarray:
+        rows, cols = indices.shape
+        if self.settings["use_color"]:
+            colors = (
+                source.reshape(rows, self.grid_size, cols, self.char_width, 3).mean(
+                    axis=(1, 3)
+                )
+                * 255
+            )
+            cell_paper = (
+                paper
+                if paper.ndim == 1
+                else paper.reshape(rows, self.grid_size, 1, 3).mean(axis=1)
+            )
+            return readable_ink(colors, cell_paper)
+        return np.broadcast_to(self._ink(paper), (rows, cols, 3)).copy()
 
-        output_height = new_height * self.grid_size
-        output_width = new_width * self.char_width
-        fg_color = hex_to_bgr(self.colors[1])
-        output_img = np.full((output_height, output_width, 3), fg_color, dtype=np.uint8)
+    def generate_grid(self, img: np.ndarray) -> dict[str, Any]:
+        """Return actual text and per-cell RGB ink, without stamping a glyph mask."""
+        gray, source, rows, cols = self._prepare(img)
+        paper = self._paper(source)
+        indices = self._indices(gray, rows, cols, paper)
+        colors = self._cell_colors(source, paper, indices)
+        paper_rows = np.broadcast_to(paper, (source.shape[0], 1, 3))
+        return {
+            "text": self._text_from_indices(indices),
+            "colors": np.rint(colors[..., ::-1]).astype(np.uint8).tobytes(),
+            "paper": np.rint(paper_rows[:, 0, ::-1]).astype(np.uint8).tobytes(),
+            "columns": cols,
+            "rows": rows,
+            "cellWidth": self.char_width,
+            "cellHeight": self.grid_size,
+            "width": source.shape[1],
+            "height": source.shape[0],
+        }
 
-        self._paste_characters(output_img, combined_indices)
-        return output_img
 
-def generate_ascii_image_sprite(img: np.ndarray, settings: Dict[str, Any]) -> np.ndarray:
-    """Convenience function to generate colored ASCII art"""
-    generator = SpriteASCIIGenerator(settings)
-    return generator.generate_ascii(img)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate ASCII art from an image.")
-    parser.add_argument("image_path", help="Path to the image file.")
-    args = parser.parse_args()
-    image_path = args.image_path
-    img = cv2.imread(image_path)
-    settings = {
-        "use_edge": True,
-        "edge_threshold": 90,
-        "use_color": False,
-        "font_size": 8,
-        "sharpness": 5,
-        "white_point": 128
-    }
-    rescaled_img = generate_ascii_image_sprite(img, settings)
-
-    result = cv2.imwrite("result.png", rescaled_img)
-    print(result)
-
-if __name__ == "__main__":
-    main()
+def generate_ascii_image_sprite(
+    img: np.ndarray, settings: Mapping[str, Any] | None = None
+) -> np.ndarray:
+    """Generate an ASCII image using a reusable renderer's default pipeline."""
+    return SpriteASCIIGenerator(settings).generate_ascii(img)

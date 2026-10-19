@@ -28,9 +28,24 @@ __version__ = "0.1.0"
 __author__ = "Adhip Kashyap"
 
 # Public API exports
-from .generators.sprite_generator import SpriteASCIIGenerator, generate_ascii_image_sprite
+from .generators.sprite_generator import (
+    SpriteASCIIGenerator,
+    generate_ascii_image_sprite,
+)
 from .filters.dog_filter import DoGFilter
-from .utils.helpers import sobel, hex_to_bgr, downsample_mode
+from typing import Any
+
+
+def __getattr__(name: str) -> Any:
+    """Load legacy SciPy utilities only when requested by a caller."""
+    if name in {"sobel", "hex_to_bgr", "downsample_mode"}:
+        from ascii_art.utils import helpers
+
+        value = getattr(helpers, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "SpriteASCIIGenerator",
@@ -38,5 +53,5 @@ __all__ = [
     "generate_ascii_image_sprite",
     "sobel",
     "hex_to_bgr",
-    "downsample_mode"
+    "downsample_mode",
 ]

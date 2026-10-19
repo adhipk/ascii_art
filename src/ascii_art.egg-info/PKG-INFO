@@ -47,10 +47,16 @@ Generate ASCII art from an image:
 ascii-art input.jpg -o output.png
 ```
 
-With edge detection:
+Customize edge detection sensitivity:
 
 ```bash
-ascii-art input.jpg --use-edge --edge-threshold 90 -o output.png
+ascii-art input.jpg --edge-threshold 70 -o output.png
+```
+
+Disable edge detection:
+
+```bash
+ascii-art input.jpg --no-edge -o output.png
 ```
 
 ### Programmatic API
@@ -59,8 +65,33 @@ ascii-art input.jpg --use-edge --edge-threshold 90 -o output.png
 from ascii_art import SpriteASCIIGenerator
 import cv2
 
-# Create generator with default settings
+# Create generator with default settings (edge detection enabled)
 generator = SpriteASCIIGenerator()
+
+# Load and process an image
+img = cv2.imread("input.jpg")
+ascii_img = generator.generate_ascii(img)
+
+# Save result
+cv2.imwrite("output.png", ascii_img)
+```
+
+Customize settings:
+
+```python
+from ascii_art import SpriteASCIIGenerator
+import cv2
+
+# Create generator with custom settings
+settings = {
+    "use_edge": True,        # Enable edge detection (default: True)
+    "edge_threshold": 70,    # Edge detection sensitivity (default: 90)
+    "font_size": 8,          # Font size for characters (default: 8)
+    "sharpness": 5,          # Image sharpness (default: 100)
+    "white_point": 128       # White point threshold (default: 2)
+}
+
+generator = SpriteASCIIGenerator(settings)
 
 # Load and process an image
 img = cv2.imread("input.jpg")

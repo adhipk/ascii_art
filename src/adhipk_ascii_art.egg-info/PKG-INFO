@@ -1,0 +1,151 @@
+Metadata-Version: 2.4
+Name: adhipk-ascii-art
+Version: 0.1.0
+Summary: A Python library for generating ASCII art from images with advanced filtering capabilities
+Project-URL: Homepage, https://github.com/adhipkashyap/ascii-art
+Project-URL: Repository, https://github.com/adhipkashyap/ascii-art
+Project-URL: Documentation, https://github.com/adhipkashyap/ascii-art#readme
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Multimedia :: Graphics
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: opencv-python>=4.5.0
+Requires-Dist: pillow>=8.0.0
+Requires-Dist: scipy>=1.7.0
+
+# ASCII Art Library
+
+A Python library for generating ASCII art from images with advanced filtering capabilities.
+
+## Features
+
+- Generate high-quality ASCII art from images
+- Sprite-based character rendering for better visual results
+- Edge detection using Difference of Gaussians (DoG) filtering
+- Configurable character sets and rendering parameters
+- Both programmatic API and command-line interface
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Usage
+
+### Command Line Interface
+
+Generate ASCII art from an image:
+
+```bash
+ascii-art input.jpg -o output.png
+```
+
+Customize edge detection sensitivity:
+
+```bash
+ascii-art input.jpg --edge-threshold 70 -o output.png
+```
+
+Disable edge detection:
+
+```bash
+ascii-art input.jpg --no-edge -o output.png
+```
+
+### Programmatic API
+
+```python
+from ascii_art import SpriteASCIIGenerator
+import cv2
+
+# Create generator with default settings (edge detection enabled)
+generator = SpriteASCIIGenerator()
+
+# Load and process an image
+img = cv2.imread("input.jpg")
+ascii_img = generator.generate_ascii(img)
+
+# Save result
+cv2.imwrite("output.png", ascii_img)
+```
+
+Customize settings:
+
+```python
+from ascii_art import SpriteASCIIGenerator
+import cv2
+
+# Create generator with custom settings
+settings = {
+    "use_edge": True,        # Enable edge detection (default: True)
+    "edge_threshold": 70,    # Edge detection sensitivity (default: 90)
+    "font_size": 8,          # Font size for characters (default: 8)
+    "sharpness": 5,          # Image sharpness (default: 100)
+    "white_point": 128       # White point threshold (default: 2)
+}
+
+generator = SpriteASCIIGenerator(settings)
+
+# Load and process an image
+img = cv2.imread("input.jpg")
+ascii_img = generator.generate_ascii(img)
+
+# Save result
+cv2.imwrite("output.png", ascii_img)
+```
+
+### Configuration
+
+You can customize the ASCII art generation by passing settings to the generator:
+
+```python
+settings = {
+    "use_edge": True,        # Enable edge detection
+    "edge_threshold": 90,    # Edge detection threshold
+    "font_size": 8,          # Font size for characters
+    "sharpness": 5,          # Image sharpness
+    "white_point": 128       # White point threshold
+}
+
+generator = SpriteASCIIGenerator(settings)
+```
+
+## API Reference
+
+### SpriteASCIIGenerator
+
+Main class for generating ASCII art using sprite-based approach.
+
+#### Methods
+
+- `__init__(settings)`: Initialize the generator with settings
+- `generate_ascii(img)`: Generate ASCII art from an image
+
+### DoGFilter
+
+Difference of Gaussians filter for edge detection.
+
+#### Methods
+
+- `__init__(settings)`: Initialize the filter with settings
+- `difference_of_gaussian(image)`: Apply DoG filter to an image
+- `flow_dog(image)`: Apply flow-based DoG filtering
+
+## Requirements
+
+- Python 3.11+
+- OpenCV
+- NumPy
+- Pillow
+- SciPy
+
+## License
+
+MIT
