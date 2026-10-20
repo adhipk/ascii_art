@@ -71,6 +71,8 @@ export function fitShapeGrid(base: RenderResult, rgba: Uint8ClampedArray, atlas:
         const edge = base.contourCells?.subarray(row*base.columns+column,row*base.columns+column+span).some(Boolean) ?? false;
         if (span===2 && edge) continue;
         const forced = span===1 && edge ? group.indices.find(i=>atlas.candidates[i].text===original[row][column]) : undefined;
+        if(span===1 && edge && forced===undefined)
+          throw new Error(`Shape atlas is missing contour character: ${original[row][column]}`);
         let candidate: number, error: number;
         if(forced!==undefined) {
           candidate=forced; error=target.reduce((sum,v,i)=>sum+(v-atlas.candidates[forced].mask[i])**2,0);

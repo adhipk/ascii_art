@@ -26,16 +26,30 @@ test("projects reject unsupported versions, invalid controls and pixel lengths",
   }
 });
 
-test("shape projects require every single tone-ramp glyph before restoration",()=>{
+test("shape projects require every tone-ramp and contour glyph before restoration",()=>{
   const shapeOptions={...options,"shape-matching":true};
   const atlas={width:8,height:17,size:12,baseline:12,candidates:[
-    ...[..." .:-=+*#%@"].map(text=>({text,span:1,mask:Array(136).fill(.25)})),
+    ...[..." .:-=+*#%@/|\\"].map(text=>({text,span:1,mask:Array(136).fill(.25)})),
     {text:"==",span:2,mask:Array(272).fill(.25)}]};
   const complete=JSON.parse(encodeProject({width:1,height:1,data:new Uint8ClampedArray(4)},shapeOptions,{text_metrics:metrics,shape_atlas:atlas} as RenderSettings));
   expect(()=>decodeProject(JSON.stringify(complete))).not.toThrow();
-  for(const char of " .:-=+*#%@") {
+  for(const char of " .:-=+*#%@/|\\") {
     const invalid=structuredClone(complete);
     invalid.metrics.shape_atlas.candidates=invalid.metrics.shape_atlas.candidates.filter((c:any)=>c.text!==char);
     expect(()=>decodeProject(JSON.stringify(invalid))).toThrow("Incomplete shape atlas");
   }
+});
+
+test("imported metrics cannot override visible renderer settings",()=>{
+  const project=JSON.parse(encodeProject({width:1,height:1,data:new Uint8ClampedArray(4)},options,settings));
+  Object.assign(project.metrics,{columns:21,layout:"adaptive",font_size:20,use_color:true,background:"#000000"});
+  const restored=decodeProject(JSON.stringify(project));
+  expect(Object.keys(restored.metrics).sort()).toEqual(["adaptive_metrics","shape_atlas","text_metrics"]);
+  const effective={columns:Number(restored.options.columns),layout:restored.options.layout,font_size:Number(restored.options["font-size"]),use_color:restored.options.color,background:restored.options.background,...restored.metrics};
+  expect(effective.columns).toBe(100);
+  expect(effective.layout).toBe("fixed");
+  expect(effective.font_size).toBe(12);
+  expect(effective.use_color).toBe(false);
+  expect(effective.background).toBe("#ffffff");
+  expect(effective.text_metrics).toEqual(metrics);
 });

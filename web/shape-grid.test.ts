@@ -50,6 +50,14 @@ test("explicit directional contours remain single cells and cannot join a pair",
   expect(fitted.shapes!.runs.map(run=>[run.column,vocabulary.candidates[run.candidate].span])).toEqual([[0,1],[1,1],[2,1]]);
 });
 
+test("missing forced contour masks fail instead of silently erasing contours",()=>{
+  for(const char of "/|\\") {
+    const b=base(); b.text=` ${char} `; b.contourCells=new Uint8Array([0,1,0]);
+    expect(()=>fitShapeGrid(b,new Uint8ClampedArray(b.width*b.height*4).fill(255),atlas))
+      .toThrow(`Shape atlas is missing contour character: ${char}`);
+  }
+});
+
  test("tone dashes do not lock cells or block a better pair",()=>{
   const b=base(2); b.text="--"; b.contourCells=new Uint8Array(2);
   const pair=Array.from({length:32},(_,i)=>i%8===3||i%8===4?1:0);

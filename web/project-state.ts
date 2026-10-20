@@ -60,10 +60,16 @@ function validateMetrics(value: unknown, options: Options): Metrics {
     for(const c of atlas.candidates) if(!c || ![1,2].includes(c.span) || typeof c.text!=="string" || c.text.length!==c.span || !/^[ -~]+$/.test(c.text) ||
       !Array.isArray(c.mask) || c.mask.length!==atlas.width*atlas.height*c.span || c.mask.some(x=>!Number.isFinite(x)||x<0||x>1)) throw new Error("Invalid shape candidate");
     if(![1,2].every(span=>atlas.candidates.some(c=>c.span===span)) ||
-      ![..." .:-=+*#%@"].every(text=>atlas.candidates.some(c=>c.span===1 && c.text===text)))
-      throw new Error("Incomplete shape atlas: missing span or tone-ramp character");
+      ![..." .:-=+*#%@/|\\"].every(text=>atlas.candidates.some(c=>c.span===1 && c.text===text)))
+      throw new Error("Incomplete shape atlas: missing span, tone-ramp or contour character");
   } else if(metrics.shape_atlas) throw new Error("Unexpected shape atlas");
-  return metrics;
+  // Imported objects may contain render settings beyond this measured data.
+  // Only these fields may be spread into the current controls' settings.
+  return {
+    text_metrics: metrics.text_metrics,
+    adaptive_metrics: metrics.adaptive_metrics,
+    shape_atlas: metrics.shape_atlas,
+  };
 }
 export function encodeProject(source: {width:number;height:number;data:Uint8ClampedArray}, options: Options, settings: RenderSettings): string {
   const metrics={text_metrics:settings.text_metrics,adaptive_metrics:settings.adaptive_metrics,shape_atlas:settings.shape_atlas};
