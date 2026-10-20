@@ -102,3 +102,4 @@ fieldset .select-label:has(input[type=color]) { margin-top:24px; }
 }
 @media(max-width:400px) { form { grid-template-columns:1fr; } .header-actions button { padding:6px 8px; } }
 @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none !important; } }
+.project-actions { display:flex; flex-wrap:wrap; gap:12px; margin:16px 0; }

@@ -1,5 +1,6 @@
 import { renderInPython } from "./python-render";
 import { TinyEdges } from "./tiny-edges";
+import { fitShapeGrid } from "./shape-grid";
 const tinyEdges = new TinyEdges();
 
 // The page never sends executable code: only pixels and renderer settings.
@@ -51,7 +52,17 @@ self.onmessage = async ({ data }) => {
         throw new Error(`Tiny edge detector failed. Choose Classic DoG to continue. ${error instanceof Error ? error.message : error}`);
       }
     }
-    const output = renderInPython(py, sourcePixels, data.width, data.height, data.settings, edges);
+    const {shape_atlas, ...pythonSettings} = data.settings;
+    let output = renderInPython(py, sourcePixels, data.width, data.height, pythonSettings, edges);
+    if (shape_atlas && data.settings.layout !== "adaptive") {
+      publishStatus("Matching character shapes and ligatures…", data.id);
+      const source = new OffscreenCanvas(data.width, data.height);
+      source.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(sourcePixels),data.width,data.height),0,0);
+      const target = new OffscreenCanvas(output.width,output.height);
+      const context = target.getContext("2d",{willReadFrequently:true})!;
+      context.drawImage(source,0,0,output.width,output.height);
+      output = fitShapeGrid(output,context.getImageData(0,0,output.width,output.height).data,shape_atlas);
+    }
     self.postMessage({ type: "result", id: data.id, ...output });
   } catch (error) {
     self.postMessage({ type: "error", id: data.id, message: error instanceof Error ? error.message : String(error) });

@@ -1,0 +1,161 @@
+{
+  "font": "/Users/adhipkashyap/Library/Fonts/FiraCodeNerdFont-Regular.ttf",
+  "dimensions": [
+    20,
+    24
+  ],
+  "rawCandidates": 324,
+  "candidates": 324,
+  "changedSequences": [
+    "..",
+    "::",
+    ":=",
+    ":|",
+    ":<",
+    ":>",
+    "--",
+    "-|",
+    "-<",
+    "->",
+    "-~",
+    "=:",
+    "==",
+    "=|",
+    "=>",
+    "=!",
+    "++",
+    "+>",
+    "**",
+    "*/",
+    "*>",
+    "#:",
+    "#=",
+    "##",
+    "#!",
+    "#_",
+    "%%",
+    "/=",
+    "/*",
+    "//",
+    "/\\",
+    "/>",
+    "|:",
+    "|-",
+    "||",
+    "|>",
+    "\\/",
+    "<:",
+    "<-",
+    "<=",
+    "<+",
+    "<*",
+    "</",
+    "<|",
+    "<<",
+    "<>",
+    "<~",
+    ">:",
+    ">-",
+    ">=",
+    ">>",
+    "!=",
+    "!!",
+    "~-",
+    "~@",
+    "~>",
+    "~~",
+    "__"
+  ],
+  "groups": {
+    "test.png": {
+      "patches": 300,
+      "exhaustiveMs": 47.622292000000016,
+      "earlyExitMs": 16.615375000000085,
+      "prunedMs": 3.328708000000006,
+      "culled": [
+        92467,
+        1023,
+        1109
+      ],
+      "full": 334,
+      "early": 2267,
+      "pixels": 1068757,
+      "mismatches": 0
+    },
+    "taylor.png": {
+      "patches": 300,
+      "exhaustiveMs": 46.68929099999991,
+      "earlyExitMs": 41.481624999999894,
+      "prunedMs": 18.755249999999933,
+      "culled": [
+        52162,
+        3119,
+        6969
+      ],
+      "full": 637,
+      "early": 34313,
+      "pixels": 14280958,
+      "mismatches": 0
+    },
+    "webb-poster.webp": {
+      "patches": 300,
+      "exhaustiveMs": 46.74545899999998,
+      "earlyExitMs": 30.367334000000028,
+      "prunedMs": 24.4982500000001,
+      "culled": [
+        25659,
+        8372,
+        12470
+      ],
+      "full": 1049,
+      "early": 49650,
+      "pixels": 19095086,
+      "mismatches": 0
+    },
+    "exact-masks": {
+      "patches": 300,
+      "exhaustiveMs": 46.61079199999995,
+      "earlyExitMs": 18.01037499999984,
+      "prunedMs": 7.971999999999753,
+      "culled": [
+        71539,
+        1168,
+        5544
+      ],
+      "full": 959,
+      "early": 17990,
+      "pixels": 4279048,
+      "mismatches": 0
+    },
+    "flat": {
+      "patches": 64,
+      "exhaustiveMs": 9.821124999999938,
+      "earlyExitMs": 7.91150000000016,
+      "prunedMs": 4.720082999999704,
+      "culled": [
+        8604,
+        421,
+        1872
+      ],
+      "full": 129,
+      "early": 9710,
+      "pixels": 3715340,
+      "mismatches": 0
+    },
+    "noise": {
+      "patches": 300,
+      "exhaustiveMs": 46.577332999999726,
+      "earlyExitMs": 44.00962500000014,
+      "prunedMs": 48.44520900000043,
+      "culled": [
+        0,
+        0,
+        0
+      ],
+      "full": 911,
+      "early": 96289,
+      "pixels": 41880321,
+      "mismatches": 0
+    }
+  }
+}

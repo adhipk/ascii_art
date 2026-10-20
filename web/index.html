@@ -60,6 +60,8 @@
           <label class="range-label" for="columns">Columns <output id="columns-value" for="columns">100</output></label>
           <input id="columns" type="range" min="20" max="180" step="1" value="100">
           <label class="select-label" for="font-size">Font size <select id="font-size"><option value="8">8 px</option><option value="12" selected>12 px</option><option value="16">16 px</option><option value="20">20 px</option></select></label>
+          <label class="check" for="shape-matching"><span>Shape matching + ligatures</span><input id="shape-matching" type="checkbox"></label>
+          <p class="control-help">Match single characters and connected pairs with Fira Code. Text export needs the same font and shaping; PNG preserves the exact result.</p>
         </fieldset>
         <fieldset>
           <legend class="sr-only">Edge settings</legend>
@@ -90,6 +92,12 @@
           <label id="solid-background" class="select-label" for="background" hidden>Paper color <input id="background" type="color" value="#ffffff"></label>
         </fieldset>
       </form>
+      <div class="project-actions">
+        <button id="export-options" type="button" class="text-button">Export options</button>
+        <button id="save-project" type="button" class="text-button" disabled>Save project</button>
+        <button id="load-project" type="button" class="text-button">Load project</button>
+        <input id="project-file" type="file" accept="application/json,.json" hidden>
+      </div>
       <p class="privacy">Processed on your device.</p>
       <p id="runtime-note" class="runtime-note">The first render downloads the Python runtime. This can take a minute.</p>
     </aside>

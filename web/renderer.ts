@@ -1,10 +1,12 @@
 import type { TextMetrics } from "./text-view";
+import type { ShapeAtlas, ShapeResult } from "./shape-grid";
 
 export interface RenderSettings {
   columns: number;
   font_size: number;
   text_metrics?: TextMetrics;
   layout?: "fixed" | "adaptive";
+  shape_atlas?: ShapeAtlas;
   adaptive_metrics?: Record<string, TextMetrics>;
   use_edge: boolean;
   edge_method: "tiny" | "dog" | "acerola";
@@ -22,7 +24,7 @@ export interface RenderInput {
   settings: RenderSettings;
 }
 export interface AdaptiveTile { x: number; y: number; size: number; char: string; color: number[]; }
-export interface RenderResult { text: string; colors: Uint8Array; paper: Uint8Array; columns: number; rows: number; cellWidth: number; cellHeight: number; width: number; height: number; tiles?: AdaptiveTile[]; tileMetrics?: Record<string, TextMetrics>; }
+export interface RenderResult { contourCells?: Uint8Array; shapes?: ShapeResult; text: string; colors: Uint8Array; paper: Uint8Array; columns: number; rows: number; cellWidth: number; cellHeight: number; width: number; height: number; tiles?: AdaptiveTile[]; tileMetrics?: Record<string, TextMetrics>; }
 
 /** Persistent worker: upload pixels once per source, then send settings only. */
 export class Renderer {
