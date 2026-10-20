@@ -292,6 +292,9 @@ coverage squared error plus `4 * area * (normalized mask density - base tone)^2`
 Base tone comes from the existing density-calibrated grid, retaining tonal edge
 emphasis. Explicit directional edge replacements remain single cells, and pairs
 cannot cross them. A pair receives the rounded mean of its cells' RGB ink colors.
+Contour flags come from renderer indices, so an ordinary tone-ramp `-` remains
+eligible for shape matching and pairs. Loaded shape atlases must include all ten
+single-character tone-ramp masks before project controls are restored.
 This is a grayscale coverage/tone objective, not literal RGB reconstruction.
 
 The matcher first scores a seed, then applies independent 1×1, 2×2 and 4×4 block

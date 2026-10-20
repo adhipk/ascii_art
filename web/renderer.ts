@@ -24,7 +24,7 @@ export interface RenderInput {
   settings: RenderSettings;
 }
 export interface AdaptiveTile { x: number; y: number; size: number; char: string; color: number[]; }
-export interface RenderResult { shapes?: ShapeResult; text: string; colors: Uint8Array; paper: Uint8Array; columns: number; rows: number; cellWidth: number; cellHeight: number; width: number; height: number; tiles?: AdaptiveTile[]; tileMetrics?: Record<string, TextMetrics>; }
+export interface RenderResult { contourCells?: Uint8Array; shapes?: ShapeResult; text: string; colors: Uint8Array; paper: Uint8Array; columns: number; rows: number; cellWidth: number; cellHeight: number; width: number; height: number; tiles?: AdaptiveTile[]; tileMetrics?: Record<string, TextMetrics>; }
 
 /** Persistent worker: upload pixels once per source, then send settings only. */
 export class Renderer {

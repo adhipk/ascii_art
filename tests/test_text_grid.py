@@ -76,3 +76,24 @@ def test_already_contrasting_saturated_colors_are_preserved():
 def test_invalid_text_calibration_rejected(invalid):
     with pytest.raises(ValueError):
         SpriteASCIIGenerator({"text_metrics": invalid})
+
+
+def test_grid_distinguishes_tone_dash_from_identical_contour_dash(monkeypatch):
+    generator = SpriteASCIIGenerator(
+        {"text_metrics": metrics(), "columns": 20, "use_edge": False}
+    )
+
+    def selected_indices(gray, rows, cols, paper):
+        indices = np.full((rows, cols), generator.characters.index("-"), np.int32)
+        indices[:, 1] = generator.num_ascii_chars
+        return indices
+
+    monkeypatch.setattr(generator, "_indices", selected_indices)
+    result = generator.generate_grid(np.full((48, 64, 3), 127, np.uint8))
+    contours = np.frombuffer(result["contourCells"], np.uint8).reshape(
+        result["rows"], result["columns"]
+    )
+    assert set(result["text"].replace("\n", "")) == {"-"}
+    assert np.all(contours[:, 0] == 0)
+    assert np.all(contours[:, 1] == 1)
+    assert contours.sum() == result["rows"]

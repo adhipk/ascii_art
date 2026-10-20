@@ -68,7 +68,7 @@ export function fitShapeGrid(base: RenderResult, rgba: Uint8ClampedArray, atlas:
         const desiredTone=[...original[row].slice(column,column+span)].reduce((sum,char)=>sum+(toneByCharacter.get(char)??0),0)/span;
         const toneCosts=group.indices.map(i=>4*target.length*(densities[i]/Math.max(rampMaximum,1e-8)-desiredTone)**2);
         // Preserve explicit contour replacements from the base edge detector.
-        const edge = /[-/|\\]/.test(original[row].slice(column,column+span));
+        const edge = base.contourCells?.subarray(row*base.columns+column,row*base.columns+column+span).some(Boolean) ?? false;
         if (span===2 && edge) continue;
         const forced = span===1 && edge ? group.indices.find(i=>atlas.candidates[i].text===original[row][column]) : undefined;
         let candidate: number, error: number;

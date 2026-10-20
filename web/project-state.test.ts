@@ -25,3 +25,17 @@ test("projects reject unsupported versions, invalid controls and pixel lengths",
     const v=structuredClone(valid); change(v); expect(()=>decodeProject(JSON.stringify(v))).toThrow();
   }
 });
+
+test("shape projects require every single tone-ramp glyph before restoration",()=>{
+  const shapeOptions={...options,"shape-matching":true};
+  const atlas={width:8,height:17,size:12,baseline:12,candidates:[
+    ...[..." .:-=+*#%@"].map(text=>({text,span:1,mask:Array(136).fill(.25)})),
+    {text:"==",span:2,mask:Array(272).fill(.25)}]};
+  const complete=JSON.parse(encodeProject({width:1,height:1,data:new Uint8ClampedArray(4)},shapeOptions,{text_metrics:metrics,shape_atlas:atlas} as RenderSettings));
+  expect(()=>decodeProject(JSON.stringify(complete))).not.toThrow();
+  for(const char of " .:-=+*#%@") {
+    const invalid=structuredClone(complete);
+    invalid.metrics.shape_atlas.candidates=invalid.metrics.shape_atlas.candidates.filter((c:any)=>c.text!==char);
+    expect(()=>decodeProject(JSON.stringify(invalid))).toThrow("Incomplete shape atlas");
+  }
+});

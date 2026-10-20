@@ -422,6 +422,9 @@ class SpriteASCIIGenerator:
         paper_rows = np.broadcast_to(paper, (source.shape[0], 1, 3))
         return {
             "text": self._text_from_indices(indices),
+            "contourCells": (indices >= self.num_ascii_chars)
+            .astype(np.uint8)
+            .tobytes(),
             "colors": np.rint(colors[..., ::-1]).astype(np.uint8).tobytes(),
             "paper": np.rint(paper_rows[:, 0, ::-1]).astype(np.uint8).tobytes(),
             "columns": cols,

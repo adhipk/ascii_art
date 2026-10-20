@@ -43,9 +43,20 @@ test("transparent source matches blank paper and invalid dimensions fail",()=>{
 });
 
 test("explicit directional contours remain single cells and cannot join a pair",()=>{
-  const b=base(); b.text=" - ";
+  const b=base(); b.text=" - "; b.contourCells=new Uint8Array([0,1,0]);
   const vocabulary={...atlas,candidates:[...atlas.candidates,{text:"-",span:1,mask:Array.from({length:16},(_,i)=>i>=8&&i<12?1:0)}]};
   const fitted=fitShapeGrid(b,new Uint8ClampedArray(b.width*b.height*4).fill(255),vocabulary);
   expect(fitted.text).toBe(" - ");
   expect(fitted.shapes!.runs.map(run=>[run.column,vocabulary.candidates[run.candidate].span])).toEqual([[0,1],[1,1],[2,1]]);
 });
+
+ test("tone dashes do not lock cells or block a better pair",()=>{
+  const b=base(2); b.text="--"; b.contourCells=new Uint8Array(2);
+  const pair=Array.from({length:32},(_,i)=>i%8===3||i%8===4?1:0);
+  const vocabulary={...atlas,candidates:[...atlas.candidates,{text:"-",span:1,mask:Array(16).fill(.25)}]};
+  const pixels=new Uint8ClampedArray(128).fill(255);
+  for(let i=0;i<32;i++)for(let c=0;c<3;c++)pixels[i*4+c]=255*(1-pair[i]);
+  const fitted=fitShapeGrid(b,pixels,vocabulary);
+  expect(fitted.text).toBe("==");
+  expect(fitted.shapes!.stats.error).toBe(0);
+ });

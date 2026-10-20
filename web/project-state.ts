@@ -59,7 +59,9 @@ function validateMetrics(value: unknown, options: Options): Metrics {
       !Array.isArray(atlas.candidates) || atlas.candidates.length<2 || atlas.candidates.length>400) throw new Error("Invalid shape atlas");
     for(const c of atlas.candidates) if(!c || ![1,2].includes(c.span) || typeof c.text!=="string" || c.text.length!==c.span || !/^[ -~]+$/.test(c.text) ||
       !Array.isArray(c.mask) || c.mask.length!==atlas.width*atlas.height*c.span || c.mask.some(x=>!Number.isFinite(x)||x<0||x>1)) throw new Error("Invalid shape candidate");
-    if(![1,2].every(span=>atlas.candidates.some(c=>c.span===span))) throw new Error("Incomplete shape atlas");
+    if(![1,2].every(span=>atlas.candidates.some(c=>c.span===span)) ||
+      ![..." .:-=+*#%@"].every(text=>atlas.candidates.some(c=>c.span===1 && c.text===text)))
+      throw new Error("Incomplete shape atlas: missing span or tone-ramp character");
   } else if(metrics.shape_atlas) throw new Error("Unexpected shape atlas");
   return metrics;
 }
