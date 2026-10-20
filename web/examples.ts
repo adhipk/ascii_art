@@ -1,12 +1,15 @@
-/** Bundled fixtures: originals are copied verbatim; small thumbnails load first. */
-export const EXAMPLES = [
-  { id: "taylor", label: "Taylor", file: "taylor.png", thumbnail: "taylor.thumb.webp" },
-  { id: "webb", label: "Webb poster", file: "webb-poster.webp", thumbnail: "webb-poster.thumb.webp" },
-  { id: "spacesuit", label: "Spacesuit", file: "spacesuit-patent.webp", thumbnail: "spacesuit-patent.thumb.webp" },
-  { id: "test", label: "Test image", file: "test.png", thumbnail: "test.thumb.webp" },
-] as const;
-export type Example = typeof EXAMPLES[number];
+export interface Example { id: string; label: string; file: string; thumbnail: string; }
+
+export async function loadExamples(): Promise<Example[]> {
+  const response = await fetch(new URL("./examples.json", import.meta.url), { cache: "no-store" });
+  if (!response.ok) throw new Error(`Could not read examples (${response.status})`);
+  const examples: unknown = await response.json();
+  const safeFile = (file: unknown): file is string => typeof file === "string" && file.length > 0 && !/[\\/\x00-\x1f]/.test(file) && file !== "." && file !== "..";
+  if (!Array.isArray(examples) || examples.some(example => !example || typeof example.id !== "string" || typeof example.label !== "string" || !safeFile(example.file) || !safeFile(example.thumbnail)))
+    throw new Error("Invalid example catalog");
+  return examples;
+}
 
 export function exampleUrl(file: string): URL {
-  return new URL(`./examples/${file}`, import.meta.url);
+  return new URL(`./examples/${encodeURIComponent(file)}`, import.meta.url);
 }

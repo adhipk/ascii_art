@@ -1,0 +1,6 @@
+/** Coherent starting points; every selected value remains visible and editable. */
+export const FIT_PRESETS: Record<string,Record<string,string>> = {
+  quick: {"fitting-resolution":"128","glyph-budget":"128","search-effort":"fast","coarse-rounds":"2","beam-width":"1","kernel-blur":"2","detail-sharpen":"1","contour-weight":"3","overlap-limit":"100","overlap-penalty":"0.1","repeat-penalty":"0.2","coarse-threshold":"0.2","glyph-vocabulary":"shape-detail","scale-schedule":"all","search-backend":"auto"},
+  balanced: {"fitting-resolution":"192","glyph-budget":"128","search-effort":"fast","coarse-rounds":"3","beam-width":"1","kernel-blur":"2","detail-sharpen":"1","contour-weight":"3","overlap-limit":"100","overlap-penalty":"0.1","repeat-penalty":"0.2","coarse-threshold":"0.2","glyph-vocabulary":"shape-detail","scale-schedule":"all","search-backend":"auto"},
+  detail: {"fitting-resolution":"320","glyph-budget":"512","search-effort":"thorough","coarse-rounds":"4","beam-width":"1","kernel-blur":"2","detail-sharpen":"1","contour-weight":"3","overlap-limit":"100","overlap-penalty":"0.1","repeat-penalty":"0.2","coarse-threshold":"0.2","glyph-vocabulary":"shape-detail","scale-schedule":"all","search-backend":"auto"},
+};

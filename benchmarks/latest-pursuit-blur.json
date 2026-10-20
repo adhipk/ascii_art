@@ -1,0 +1,85 @@
+{
+  "runtime": "Bun 1.4.2",
+  "hardware": "Apple M1 Pro",
+  "fixture": "Taylor, cached 42-character measured atlas",
+  "settings": {
+    "budget": 64,
+    "beam": 1,
+    "effort": "fast"
+  },
+  "scope": "Single complete CPU runs, not browser/GPU timings. Different blur settings define different objective scales; energies are not directly comparable.",
+  "runs": [
+    {
+      "blur": 0,
+      "curve": [
+        {
+          "size": 48,
+          "level": 0,
+          "sigma": 0
+        },
+        {
+          "size": 24,
+          "level": 0,
+          "sigma": 0
+        },
+        {
+          "size": 12,
+          "level": 0,
+          "sigma": 0
+        },
+        {
+          "size": 6,
+          "level": 0,
+          "sigma": 0
+        },
+        {
+          "size": 3,
+          "level": 0,
+          "sigma": 0
+        }
+      ],
+      "ms": 2872.610417,
+      "glyphs": 64,
+      "energy": 0.09628819164036098,
+      "rawPixel": 0.07217448685518785,
+      "rawContour": 0.00803790159505771,
+      "diversity": 10
+    },
+    {
+      "blur": 1,
+      "curve": [
+        {
+          "size": 48,
+          "level": 3,
+          "sigma": 3.24037034920393
+        },
+        {
+          "size": 24,
+          "level": 2,
+          "sigma": 1.5811388300841898
+        },
+        {
+          "size": 12,
+          "level": 1,
+          "sigma": 0.7071067811865476
+        },
+        {
+          "size": 6,
+          "level": 0,
+          "sigma": 0
+        },
+        {
+          "size": 3,
+          "level": 0,
+          "sigma": 0
+        }
+      ],
+      "ms": 3308.667708,
+      "glyphs": 64,
+      "energy": 0.10252151433469603,
+      "rawPixel": 0.07682176326467356,
+      "rawContour": 0.008610633424432074,
+      "diversity": 11
+    }
+  ]
+}

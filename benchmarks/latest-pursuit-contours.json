@@ -1,0 +1,154 @@
+{
+  "scope": "Synthetic measured-mask oracle, 128px. Contours are >0.1 neighboring luminance differences; F1 tolerance 1px. No browser-font or photographic quality claim.",
+  "before": [
+    {
+      "kind": "underline",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0.020341167048830745,
+      "mae": 0.007920791729702614,
+      "contourF1": 0.19966722129783693,
+      "meanContourDistance": 8.90566037735849,
+      "ms": 76.82391700000001
+    },
+    {
+      "kind": "underline",
+      "budget": 8,
+      "glyphs": 8,
+      "energy": 0.01586398606079567,
+      "mae": 0.006972540304559516,
+      "contourF1": 0.5081266039349871,
+      "meanContourDistance": 2.329123596589555,
+      "ms": 113.58329099999997
+    },
+    {
+      "kind": "off-center vertical",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0.01642344658367855,
+      "mae": 0.006353709381073713,
+      "contourF1": 0.3773584905660377,
+      "meanContourDistance": 3.7049550479610134,
+      "ms": 22.984958000000006
+    },
+    {
+      "kind": "off-center vertical",
+      "budget": 8,
+      "glyphs": 8,
+      "energy": 0.008219745067166611,
+      "mae": 0.0036574144614860415,
+      "contourF1": 0.8333333333333333,
+      "meanContourDistance": 0.7049180327868853,
+      "ms": 73.863583
+    },
+    {
+      "kind": "corner",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0.021759215264199626,
+      "mae": 0.010306811309419572,
+      "contourF1": 0.5238095238095238,
+      "meanContourDistance": 1.0112239171616912,
+      "ms": 18.885417000000018
+    },
+    {
+      "kind": "corner",
+      "budget": 8,
+      "glyphs": 8,
+      "energy": 0.020362269648404787,
+      "mae": 0.010661944399544154,
+      "contourF1": 0.6090668488004781,
+      "meanContourDistance": 0.936124606788199,
+      "ms": 60.867125000000044
+    }
+  ],
+  "after": [
+    {
+      "kind": "underline",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 65.015709
+    },
+    {
+      "kind": "underline",
+      "budget": 8,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 52.46454200000001
+    },
+    {
+      "kind": "off-center vertical",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 25.502207999999996
+    },
+    {
+      "kind": "off-center vertical",
+      "budget": 8,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 33.37479099999999
+    },
+    {
+      "kind": "corner",
+      "budget": 1,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 25.194333999999998
+    },
+    {
+      "kind": "corner",
+      "budget": 8,
+      "glyphs": 1,
+      "energy": 0,
+      "mae": 0,
+      "contourF1": 1,
+      "meanContourDistance": 0,
+      "ms": 32.26754199999999
+    }
+  ],
+  "photo": {
+    "scope": "Taylor, same ASCII-filtered atlas, blur 1, beam 1, fast staged search, one broad round, budget 256. F1 from Canny sigma 1 thresholds 50/100, 2px tolerance at 2x analysis resolution. Single native runs, not browser validation.",
+    "before": {
+      "precision": 0.4261285909712722,
+      "recall": 0.4424448217317487,
+      "f1": 0.4341334554101763,
+      "false_contour_rate": 0.5738714090287278,
+      "position_error_px": 8.571308135986328,
+      "energy": 0.09780944254552677,
+      "rawPixel": 0.0716618278296913,
+      "rawContour": 0.00958589336038227,
+      "glyphs": 140,
+      "ms": 1647.625125
+    },
+    "after": {
+      "precision": 0.42824858757062145,
+      "recall": 0.4893039049235993,
+      "f1": 0.4567448901080521,
+      "false_contour_rate": 0.5717514124293785,
+      "position_error_px": 7.850155591964722,
+      "energy": 0.07999319422767338,
+      "rawPixel": 0.0579004114170643,
+      "rawContour": 0.00935805082192573,
+      "glyphs": 125,
+      "ms": 3068.991291
+    }
+  }
+}

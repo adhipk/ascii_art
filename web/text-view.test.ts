@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { exportTextPng, textMetrics, textPreview } from "./text-view";
+import { exportTextPng, squareTextMetrics, textMetrics, textPreview } from "./text-view";
 import type { RenderResult } from "./renderer";
 
 const originalDocument = globalThis.document;
@@ -57,4 +57,43 @@ test("PNG export draws the real characters and cell colors, with a high-resoluti
     { char: "@", x: 0, y: metrics.baseline, color: "rgb(255 0 0)" },
     { char: "%", x: 8, y: metrics.baseline, color: "rgb(0 128 255)" },
   ]);
+});
+
+
+test("adaptive calibration carries spatial alpha masks for the exact positioned font", () => {
+  let char = " ";
+  const context = {
+    font: "", fillStyle: "",
+    measureText: () => ({width: 4, fontBoundingBoxAscent: 5, fontBoundingBoxDescent: 1}),
+    clearRect() {},
+    fillText(value: string, x: number, y: number) {
+      char = value;
+      expect(x).toBe(2); expect(y).toBe(6);
+    },
+    getImageData() {
+      const data = new Uint8ClampedArray(8 * 8 * 4);
+      if (char !== " ") data[7] = 128;
+      return { data };
+    },
+  };
+  globalThis.document = { createElement: () => ({width: 0, height: 0, getContext: () => context}) } as unknown as Document;
+  const metrics = squareTextMetrics(8);
+  expect(metrics.kernelCharacters).toBe(" .:-=+*#%@/|\\");
+  expect(metrics.masks!.length).toBe(metrics.kernelCharacters!.length);
+  expect(metrics.masks![0]).toEqual(Array(64).fill(0));
+  expect(metrics.masks![1][1]).toBe(128 / 255);
+  expect(metrics.densities[1]).toBe(128 / 255 / 64);
+  expect(metrics.densities.length).toBe(10);
+  expect(squareTextMetrics(8)).toBe(metrics);
+});
+
+test("rotated pursuit glyphs use matching SVG and Canvas centers", async () => {
+  const nodes:any[]=[]; const rotations:number[]=[]; const translations:number[][]=[];
+  const make=(tag:string)=>{const node={tag,attributes:{} as Record<string,string>,style:{},setAttribute(k:string,v:string){this.attributes[k]=v;},append(){}};nodes.push(node);return node;};
+  const context={font:"",fillStyle:"",textBaseline:"",fontKerning:"",scale(){},fillRect(){},save(){},restore(){},beginPath(){},clip(){},rect(){},fillText(){},translate(x:number,y:number){translations.push([x,y]);},rotate(angle:number){rotations.push(angle);}};
+  globalThis.document={createDocumentFragment:()=>make("fragment"),createElementNS:(_:string,tag:string)=>make(tag),createElement:()=>({width:0,height:0,getContext:()=>context,toBlob:(callback:(blob:Blob)=>void)=>callback(new Blob(["png"]))})} as unknown as Document;
+  const result:RenderResult={text:"",columns:0,rows:0,cellWidth:0,cellHeight:0,width:48,height:48,colors:new Uint8Array(),paper:new Uint8Array(48*3),tiles:[{x:8,y:12,size:16,char:"|",angle:90,color:[255,255,255]}],tileMetrics:{"16":{width:16,height:16,baseline:12,advance:8,fontSize:14,densities:[]}}};
+  textPreview(result); await exportTextPng(result,12);
+  expect(nodes.find(node=>node.tag==="text").attributes.transform).toBe("rotate(90 8 8)");
+  expect(translations).toEqual([[16,20]]); expect(rotations).toEqual([Math.PI/2]);
 });

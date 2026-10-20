@@ -1,0 +1,120 @@
+{
+  "scope": "Single native CPU Taylor runs, ASCII-only masks, budget 256, blur 1, beam 1, fast staged search. Canny sigma 1 thresholds 50/100, tolerance 2px at 2x analysis resolution. Not browser/perceptual validation.",
+  "runs": [
+    {
+      "rounds": 1,
+      "ms": 3068.991291,
+      "glyphs": 125,
+      "energy": 0.07999319422767338,
+      "stages": [
+        {
+          "index": 0,
+          "size": 48,
+          "startFrame": 0,
+          "endFrame": 96,
+          "addedGlyphs": 90,
+          "converged": true
+        },
+        {
+          "index": 1,
+          "size": 24,
+          "startFrame": 96,
+          "endFrame": 97,
+          "addedGlyphs": 1,
+          "converged": true
+        },
+        {
+          "index": 2,
+          "size": 12,
+          "startFrame": 97,
+          "endFrame": 120,
+          "addedGlyphs": 20,
+          "converged": true
+        },
+        {
+          "index": 3,
+          "size": 6,
+          "startFrame": 120,
+          "endFrame": 137,
+          "addedGlyphs": 14,
+          "converged": true
+        },
+        {
+          "index": 4,
+          "size": 3,
+          "startFrame": 137,
+          "endFrame": 137,
+          "addedGlyphs": 0,
+          "converged": true
+        }
+      ],
+      "contours": {
+        "precision": 0.42824858757062145,
+        "recall": 0.4893039049235993,
+        "f1": 0.4567448901080521,
+        "false_contour_rate": 0.5717514124293785,
+        "position_error_px": 7.850155591964722
+      }
+    },
+    {
+      "rounds": 3,
+      "ms": 3634.770042,
+      "glyphs": 128,
+      "energy": 0.07002811206016904,
+      "stages": [
+        {
+          "index": 0,
+          "size": 48,
+          "searchRounds": 3,
+          "startFrame": 0,
+          "endFrame": 134,
+          "addedGlyphs": 115,
+          "converged": true
+        },
+        {
+          "index": 1,
+          "size": 24,
+          "searchRounds": 3,
+          "startFrame": 134,
+          "endFrame": 134,
+          "addedGlyphs": 0,
+          "converged": true
+        },
+        {
+          "index": 2,
+          "size": 12,
+          "searchRounds": 1,
+          "startFrame": 134,
+          "endFrame": 149,
+          "addedGlyphs": 9,
+          "converged": true
+        },
+        {
+          "index": 3,
+          "size": 6,
+          "searchRounds": 1,
+          "startFrame": 149,
+          "endFrame": 155,
+          "addedGlyphs": 4,
+          "converged": true
+        },
+        {
+          "index": 4,
+          "size": 3,
+          "searchRounds": 1,
+          "startFrame": 155,
+          "endFrame": 155,
+          "addedGlyphs": 0,
+          "converged": true
+        }
+      ],
+      "contours": {
+        "precision": 0.43074691805656273,
+        "recall": 0.5614035087719298,
+        "f1": 0.4874721103787859,
+        "false_contour_rate": 0.5692530819434373,
+        "position_error_px": 6.774527311325073
+      }
+    }
+  ]
+}

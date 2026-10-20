@@ -1,3 +1,4 @@
+import { renderPursuitAsync } from "./pursuit";
 import { renderInPython } from "./python-render";
 import { TinyEdges } from "./tiny-edges";
 const tinyEdges = new TinyEdges();
@@ -35,14 +36,19 @@ async function initialize(id: number) {
 self.onmessage = async ({ data }) => {
   if (data.type !== "render") return;
   try {
-    runtime ??= initialize(data.id).catch((error) => { runtime = undefined; throw error; });
-    const py = await runtime;
-    publishStatus("Rendering characters…", data.id);
     if (data.pixels) {
       sourcePixels = new Uint8Array(data.pixels);
       sourceVersion = data.sourceVersion;
     }
     if (!sourcePixels || sourceVersion !== data.sourceVersion) throw new Error("Source pixels are unavailable. Choose the image again.");
+    if (data.settings.layout === "pursuit") {
+      const output = await renderPursuitAsync(sourcePixels, data.width, data.height, data.settings, message => publishStatus(message, data.id));
+      self.postMessage({ type: "result", id: data.id, ...output });
+      return;
+    }
+    runtime ??= initialize(data.id).catch((error) => { runtime = undefined; throw error; });
+    const py = await runtime;
+    publishStatus("Rendering characters…", data.id);
     let edges;
     if (data.settings.use_edge && data.settings.edge_method === "tiny") {
       try {

@@ -1,0 +1,109 @@
+{
+  "scale_aware": {
+    "width": 191,
+    "height": 192,
+    "candidates": 7476,
+    "kernels": 282,
+    "kernelCounts": {
+      "3": 82,
+      "6": 66,
+      "12": 66,
+      "24": 34,
+      "48": 34
+    },
+    "profile": "scale-aware",
+    "referenceMs": 99.966084,
+    "referenceWarmMs": 80.46541599999995,
+    "referenceSamplesMs": [
+      99.966084,
+      84.484625,
+      79.46420800000004,
+      80.46541599999995,
+      80.902875,
+      78.27395899999999
+    ],
+    "cpuRuntime": "Bun 1.4.2",
+    "color": true,
+    "edgeWeight": 3,
+    "adapter": {
+      "vendor": "",
+      "architecture": "",
+      "device": "Apple M1 Pro",
+      "description": "",
+      "stackgroup_min_size": 4,
+      "stackgroup_max_size": 128,
+      "vendor_id": 0,
+      "device_id": 0,
+      "adapter_type": "IntegratedGPU",
+      "backend_type": "Metal"
+    },
+    "wgpu_version": "0.32.0",
+    "gpu_batch_ms_median_warm": 4.119583056308329,
+    "gpu_first_batch_ms": 103.5140419844538,
+    "gpu_samples_ms": [
+      103.5140419844538,
+      4.2091249488294125,
+      4.217999987304211,
+      3.9647910743951797,
+      4.119583056308329,
+      2.8580420184880495
+    ],
+    "max_absolute_score_error": 1.772346207599626e-08,
+    "mean_absolute_score_error": 8.206081057157096e-10,
+    "scope": "One real candidate batch, native Metal/Vulkan WebGPU; includes uploads/readback, excludes pipeline creation and CPU final verification"
+  },
+  "full": {
+    "width": 191,
+    "height": 192,
+    "candidates": 11316,
+    "kernels": 410,
+    "kernelCounts": {
+      "3": 82,
+      "6": 82,
+      "12": 82,
+      "24": 82,
+      "48": 82
+    },
+    "profile": "full",
+    "referenceMs": 177.171917,
+    "referenceWarmMs": 132.12941700000005,
+    "referenceSamplesMs": [
+      177.171917,
+      132.12941700000005,
+      130.416917,
+      135.64049999999997,
+      132.10483299999999,
+      133.27970900000003
+    ],
+    "cpuRuntime": "Bun 1.4.2",
+    "color": true,
+    "edgeWeight": 3,
+    "adapter": {
+      "vendor": "",
+      "architecture": "",
+      "device": "Apple M1 Pro",
+      "description": "",
+      "stackgroup_min_size": 4,
+      "stackgroup_max_size": 128,
+      "vendor_id": 0,
+      "device_id": 0,
+      "adapter_type": "IntegratedGPU",
+      "backend_type": "Metal"
+    },
+    "wgpu_version": "0.32.0",
+    "gpu_batch_ms_median_warm": 6.610875017940998,
+    "gpu_first_batch_ms": 103.4371251007542,
+    "gpu_samples_ms": [
+      103.4371251007542,
+      6.796583998948336,
+      6.610875017940998,
+      7.7538329642266035,
+      5.416583037003875,
+      5.380708957090974
+    ],
+    "max_absolute_score_error": 2.2325817168079853e-08,
+    "mean_absolute_score_error": 1.3225556374589138e-09,
+    "scope": "One real candidate batch, native Metal/Vulkan WebGPU; includes uploads/readback, excludes pipeline creation and CPU final verification"
+  },
+  "note": "Native Apple M1 Pro candidate-batch comparison. Warm medians; GPU includes per-batch uploads/readback. Not an end-to-end browser or search speedup."
+}

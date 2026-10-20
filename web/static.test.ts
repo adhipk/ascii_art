@@ -1,6 +1,16 @@
 import { expect, test } from "bun:test";
 import { staticResponse } from "./serve";
 import { resolve } from "node:path";
+import {FIT_PRESETS} from "./fit-presets";
+
+test("studio defaults to shared-canvas fitting and retains independent debugging",async()=>{
+  const html=await (await staticResponse(new Request("http://localhost/"))).text();
+  const select=html.match(/<select id="scale-schedule">([\s\S]*?)<\/select>/)![1];
+  expect(select).toContain('<option value="all" selected>');
+  expect(select).toContain('<option value="independent">Debug · independent');
+  expect(select).not.toContain('<option value="independent" selected>');
+  for(const preset of Object.values(FIT_PRESETS))expect(preset["scale-schedule"]).toBe("all");
+});
 
 test("static page, modules, and Python sources are served with correct MIME types", async () => {
   for (const [path, mime] of [["/", "text/html"], ["/app.js", "javascript"], ["/worker.js", "javascript"], ["/style.css", "text/css"], ["/python/bridge.py", "text/"]]) {
@@ -34,10 +44,10 @@ test("unknown, invalid, and escaping paths are rejected", async () => {
 });
 
 test("all bundled examples and thumbnails are served intact", async () => {
-  const { EXAMPLES } = await import("./examples");
-  expect(EXAMPLES).toHaveLength(4);
-  expect(new Set(EXAMPLES.map((example) => example.id)).size).toBe(4);
-  for (const example of EXAMPLES) {
+  const examples = await (await staticResponse(new Request("http://localhost/examples.json"))).json();
+  expect(examples.length).toBeGreaterThanOrEqual(4);
+  expect(new Set(examples.map((example: any) => example.id)).size).toBe(examples.length);
+  for (const example of examples) {
     for (const name of [example.file, example.thumbnail]) {
       const response = await staticResponse(new Request(`http://localhost/examples/${name}`));
       expect(response.status).toBe(200);
@@ -45,7 +55,7 @@ test("all bundled examples and thumbnails are served intact", async () => {
       const bytes = new Uint8Array(await response.arrayBuffer());
       const source = new Uint8Array(await Bun.file(resolve(import.meta.dir, `examples/${name}`)).arrayBuffer());
       expect(bytes).toEqual(source);
-      if (name === example.thumbnail) expect(bytes.length).toBeLessThan(30_000);
+      if (name !== example.file && name === example.thumbnail) expect(bytes.length).toBeLessThan(30_000);
     }
   }
 });
@@ -79,4 +89,12 @@ test("local server prevents stale HTML, CSS, JS and Python assets", async () => 
     const response = await staticResponse(new Request(`http://localhost${path}`));
     expect(response.headers.get("cache-control")).toBe("no-store");
   }
+});
+
+test("stylesheet is copied verbatim to the stable URL used by index.html", async () => {
+  const source = await Bun.file(resolve(import.meta.dir,"style.css")).text();
+  const response = await staticResponse(new Request("http://localhost/style.css"));
+  expect(await response.text()).toBe(source);
+  const build = await Bun.file(resolve(import.meta.dir,"build.ts")).text();
+  expect(build).toContain('["index.html", "style.css"]');
 });

@@ -1,0 +1,98 @@
+{
+  "runtime": "Bun 1.4.2",
+  "hardware": "Apple M1 Pro",
+  "fixture": "Taylor, measured atlas filtered to printable ASCII",
+  "scope": "Single complete native CPU runs including search, verification and history. Fixed common blur objective, strength 1, fast search and beam 1. Staged scheduling changes the solution and does not guarantee better fidelity.",
+  "runs": [
+    {
+      "schedule": "coarse-to-fine",
+      "budget": 256,
+      "ms": 1647.625125,
+      "glyphs": 140,
+      "energy": 0.09780944254552677,
+      "rawPixel": 0.0716618278296913,
+      "rawContour": 0.00958589336038227,
+      "diversity": 14,
+      "candidates": 98686,
+      "stages": [
+        {
+          "index": 0,
+          "size": 48,
+          "startFrame": 0,
+          "endFrame": 74,
+          "addedGlyphs": 67,
+          "converged": true
+        },
+        {
+          "index": 1,
+          "size": 24,
+          "startFrame": 74,
+          "endFrame": 74,
+          "addedGlyphs": 0,
+          "converged": true
+        },
+        {
+          "index": 2,
+          "size": 12,
+          "startFrame": 74,
+          "endFrame": 123,
+          "addedGlyphs": 43,
+          "converged": true
+        },
+        {
+          "index": 3,
+          "size": 6,
+          "startFrame": 123,
+          "endFrame": 157,
+          "addedGlyphs": 28,
+          "converged": true
+        },
+        {
+          "index": 4,
+          "size": 3,
+          "startFrame": 157,
+          "endFrame": 159,
+          "addedGlyphs": 2,
+          "converged": true
+        }
+      ],
+      "kernelCounts": {
+        "3": 52,
+        "6": 36,
+        "12": 36,
+        "24": 14,
+        "48": 14
+      },
+      "stopReason": "No improving proposal at any remaining scale (bounded search)"
+    },
+    {
+      "schedule": "all",
+      "budget": 256,
+      "ms": 3042.500458,
+      "glyphs": 155,
+      "energy": 0.08789838868164739,
+      "rawPixel": 0.061790155157950735,
+      "rawContour": 0.009534421105915649,
+      "diversity": 17,
+      "candidates": 458287,
+      "stages": [
+        {
+          "index": 0,
+          "size": null,
+          "startFrame": 0,
+          "endFrame": 162,
+          "addedGlyphs": 155,
+          "converged": true
+        }
+      ],
+      "kernelCounts": {
+        "3": 52,
+        "6": 36,
+        "12": 36,
+        "24": 14,
+        "48": 14
+      },
+      "stopReason": "No improving proposal in the bounded search"
+    }
+  ]
+}

@@ -16,6 +16,8 @@
       <button id="sample" type="button">Try sample</button>
       <span class="action-divider" aria-hidden="true"></span>
       <button id="png" type="button" disabled>Download PNG</button>
+      <button id="copy-debug-state" type="button" disabled title="Copy compact run settings and selected-frame metrics without images or pixel arrays. Paste alongside a screenshot.">Copy debug state</button>
+      <button id="copy-debug" type="button" disabled title="Copy original, selected output and configuration. Plain-text paste contains self-contained JSON with embedded PNGs.">Copy full artifact</button>
       <button id="text" type="button" disabled>Text</button>
     </div>
   </header>
@@ -33,6 +35,7 @@
       </div>
       <div id="stage" class="stage" tabindex="0" aria-label="Image preview. Drop an image here to replace it.">
         <img id="original" alt="Original image" hidden>
+        <canvas id="residual-preview" role="img" aria-label="Signed residual: red means reconstruction too dark, blue means too light" hidden></canvas>
         <div id="output" class="ascii-text" role="img" aria-label="ASCII art preview rendered as text" hidden></div>
         <div id="empty" class="empty"><p>Your image, in characters.</p><span>Choose an image or try the sample.</span></div>
         <div id="drop-hint" aria-hidden="true">Drop image to replace</div>
@@ -46,22 +49,83 @@
       </div>
     </section>
     <aside class="inspector" aria-labelledby="adjustments-heading">
-      <div class="inspector-heading"><h2 id="adjustments-heading">Adjustments</h2><button id="reset" class="text-button" type="button">Reset</button></div>
-      <p class="hint">Changes update automatically.</p>
-      <section class="examples" aria-labelledby="examples-heading">
-        <h3 id="examples-heading">Examples</h3>
+      <div class="inspector-heading"><h2 id="adjustments-heading">Control lab</h2><button id="reset" class="text-button" type="button">Reset settings</button></div>
+      <p class="hint">Fit a run → replay its cached frames → inspect what changed.</p>
+      <section class="examples panel-section">
+        <div class="examples-heading"><h3>Test images</h3><button id="refresh-examples" class="text-button" type="button">Refresh</button></div>
+        <p id="examples-note" class="control-help">Choose an image to try.</p>
         <div id="examples" class="example-list"></div>
       </section>
+      <nav id="workflow-nav" class="workflow-nav" aria-label="Control panel stages"><a href="#controls">1 Fit</a><a href="#iteration-lab">2 Replay</a><a href="#inspect-panel">3 Inspect</a></nav>
       <form id="controls">
-        <fieldset>
-          <legend class="sr-only">Character grid</legend>
-          <label class="select-label" for="layout">Layout <select id="layout"><option value="fixed" selected>Fixed grid</option><option value="adaptive">Adaptive · 8 / 16 / 32 px</option></select></label>
-          <p class="control-help">Adaptive cells get smaller around edges and detail. PNG keeps mixed sizes; text uses a fixed grid.</p>
-          <label class="range-label" for="columns">Columns <output id="columns-value" for="columns">100</output></label>
+        <h3>1 · Fit <span class="scope-badge compute-badge">Needs Run</span></h3>
+        <p class="section-guide">Set the image, scoring rules and search effort, then run once. Changes stay pending until you press Run fit.</p>
+          <label class="select-label" for="layout">Style <select id="layout"><option value="fixed" selected>Fixed grid</option><option value="adaptive">Adaptive grid</option><option value="pursuit">Painting</option></select></label>
+        <p id="grid-help" class="control-help">Fixed uses equal cells. Adaptive uses smaller cells around detail. Painting builds up overlapping glyphs.</p>
+        <div class="run-controls"><p id="fit-plan" class="control-help"></p><button id="run-fit" class="primary" type="submit">Run fit</button><p id="fit-state" role="status">Ready to fit</p></div>
+        <div id="pursuit-primary" hidden>
+          <label class="select-label" for="fit-preset">Starting point <select id="fit-preset"><option value="quick">Quick experiment</option><option value="balanced" selected>Balanced</option><option value="detail">Detail study</option><option value="custom">Custom</option></select></label>
+          <fieldset class="control-group"><legend>Capacity &amp; resolution</legend>
+            <label class="range-label secondary" for="glyph-budget"><span id="budget-caption">Maximum glyphs</span> <output id="budget-value">128</output></label>
+            <input id="glyph-budget" type="range" min="16" max="2048" step="16" value="128">
+            <p id="budget-help" class="control-help">One total glyph budget shared across the 8, 16 and 32px scales. Every edit is scored against the same current image.</p>
+            <label class="select-label" for="fitting-resolution">Detail <select id="fitting-resolution"><option value="128">Quick</option><option value="192" selected>Balanced</option><option value="320">Fine</option></select></label>
+          <p class="control-help">Maximum glyphs limits how much paint can be added. Detail sets the analysis resolution; higher values preserve finer structure and cost more to search.</p>
+          </fieldset>
+        </div>
+        <div id="pursuit-controls" hidden>
+          <fieldset class="control-group"><legend>Characters at each scale</legend>
+            <p class="section-guide">Choose the shapes each pass can propose. Larger scales paint structure; smaller scales add detail. Visible switches instantly show or hide cached layers in the preview and PNG. Fitting metrics and residuals describe the full fit.</p>
+            <label class="select-label" for="glyph-vocabulary">Starting vocabulary <select id="glyph-vocabulary"><option value="shape-detail" selected>Blocky → detailed</option><option value="scale-aware">Strokes → detailed</option><option value="full">Same bundled set at every scale</option></select></label>
+            <label class="check"><input id="solid-brush" type="checkbox"> Solid square brush at every enabled scale</label><p class="control-help">Adds an exact filled square. The smallest scale works like pixels.</p>
+            <div id="scale-character-inputs"></div>
+            <button id="reset-scale-characters" type="button" class="text-button">Reset all sets to defaults</button>
+            <p class="control-help">Use Unicode letters, shapes or emoji. Combining marks and emoji sequences count as one glyph; available fonts determine their shapes. Empty means skip that scale. Changes need Run fit; the current preview keeps its original character sets.</p>
+            <p id="scale-character-summary" class="control-help"></p>
+          </fieldset>
+          <fieldset class="control-group"><legend>What counts as a good match?</legend>
+            <label class="range-label secondary" for="overlap-penalty">Overlap penalty <output id="overlap-penalty-value">0.1</output></label>
+            <input id="overlap-penalty" type="range" min="0" max="5" step="0.05" value="0.1">
+            <label class="range-label secondary" for="repeat-penalty">Local repeat penalty <output id="repeat-penalty-value">0.2</output></label>
+            <input id="repeat-penalty" type="range" min="0" max="5" step="0.05" value="0.2">
+            <p class="control-help">Penalties apply only to glyphs at 24px analysis size and above. Smaller glyphs can freely refine coarse shapes. A soft cost for painting over existing ink. Zero is free layering. Higher values favor fresh areas, while still allowing crossings that improve the total score. The separate overlap limit is a hard cap.</p>
+            <label class="range-label secondary" for="kernel-blur">Kernel blur <output id="kernel-blur-value">2</output></label>
+            <input id="kernel-blur" type="range" min="0" max="3" step="0.25" value="2">
+            <p class="control-help">Blur follows kernel size: large shapes emphasize structure, small shapes preserve detail. Zero uses sharp-image error.</p>
+            <label class="range-label secondary" for="detail-sharpen">8px detail sharpening <output id="detail-sharpen-value">1</output></label>
+            <input id="detail-sharpen" type="range" min="0" max="3" step="0.25" value="1">
+            <p class="control-help">Independent layers: strengthen edges in the 8px target using unsharp masking and sharp scoring. Coarse layers keep their blur. Zero restores ordinary fitting; high values can add halos or noise.</p>
+            <label class="range-label secondary" for="contour-weight">Contour fidelity <output id="contour-weight-value">3</output></label>
+            <input id="contour-weight" type="range" min="0" max="8" step="0.5" value="3">
+
+          <p class="control-help">Contour fidelity weights edge alignment against tone. Increase it to favor sharper boundaries; it can reduce tonal accuracy.</p>
+          </fieldset>
+          <fieldset class="control-group"><legend>How should the search work?</legend>
+          <p class="section-guide">Each step proposes glyph edits, scores them and keeps an improvement. These settings control which edits get a chance.</p>
+            <label class="select-label" for="search-backend">Candidate scorer <select id="search-backend"><option value="auto" selected>Auto · GPU when available</option><option value="cpu">CPU · reference</option><option value="webgpu">WebGPU · CPU fallback</option></select></label>
+            <label class="select-label" for="scale-schedule">Layer fitting <select id="scale-schedule"><option value="all" selected>Shared image · scales compete</option><option value="coarse-to-fine">Sequential · large to small</option><option value="independent">Debug · independent full-image layers</option></select></label>
+            <label class="range-label secondary" for="coarse-threshold">Broad early exit <output id="coarse-threshold-value">0.2%</output></label>
+            <input id="coarse-threshold" type="range" min="0" max="1" step="0.1" value="0.2">
+            <p class="control-help">Move to detail when broad strokes make only small improvements. Zero keeps polishing the broad layer.</p>
+            <label class="range-label secondary" for="coarse-rounds">Broad search rounds <output id="coarse-rounds-value">3</output></label>
+            <input id="coarse-rounds" type="range" min="1" max="8" step="1" value="3">
+            <p class="control-help">Spend more search and refinement rounds at the two largest sizes before adding fine detail. Higher values take longer.</p>
+            <label class="select-label" for="search-effort">Search effort <select id="search-effort"><option value="fast" selected>Fast · more iterations</option><option value="thorough">Thorough · broader candidates</option></select></label>
+            <label class="range-label secondary" for="overlap-limit">Ink overlap limit <output id="overlap-value">100%</output></label>
+            <input id="overlap-limit" type="range" min="0" max="100" step="5" value="100">
+            <p class="control-help">Limits repeated paint over existing strokes. Crossings use actual ink overlap, not cell boundaries. Set 100% to allow unrestricted layering.</p>
+            <label class="select-label" for="beam-width">Competing compositions <select id="beam-width"><option value="1" selected>1 · faster</option><option value="2">2 · balanced</option><option value="3">3 · broader search</option></select></label>
+
+          </fieldset>
+        </div>
+        <fieldset class="control-group"><legend>Output geometry</legend>
+          <label class="range-label" for="columns"><span id="column-caption">Columns</span> <output id="columns-value" for="columns">100</output></label>
           <input id="columns" type="range" min="20" max="180" step="1" value="100">
           <label class="select-label" for="font-size">Font size <select id="font-size"><option value="8">8 px</option><option value="12" selected>12 px</option><option value="16">16 px</option><option value="20">20 px</option></select></label>
+
+          <p class="control-help">For painting, display columns changes output size, not fitting detail. Font size applies to the fixed grid.</p>
         </fieldset>
-        <fieldset>
+        <fieldset id="detector-controls">
           <legend class="sr-only">Edge settings</legend>
           <label class="check" for="edges"><span>Contour emphasis</span><input id="edges" type="checkbox"></label>
           <label class="select-label edge-method" for="edge-method">Detector
@@ -89,9 +153,49 @@
           <p id="background-help" class="control-help">A soft gradient from your image’s colors.</p>
           <label id="solid-background" class="select-label" for="background" hidden>Paper color <input id="background" type="color" value="#ffffff"></label>
         </fieldset>
+
       </form>
+      <section id="iteration-lab" class="iteration-lab" aria-labelledby="iteration-heading" hidden>
+        <h3 id="iteration-heading">2 · Replay <span class="scope-badge">Instant</span></h3>
+        <fieldset class="scale-range"><legend>Visible scale range</legend>
+          <label class="range-label" for="visible-scale-min">Finest <output id="visible-scale-min-value"></output></label>
+          <input id="visible-scale-min" type="range" min="0" max="0" step="1" value="0" aria-label="Finest visible glyph scale" list="visible-scale-ticks">
+          <label class="range-label" for="visible-scale-max">Coarsest <output id="visible-scale-max-value"></output></label>
+          <input id="visible-scale-max" type="range" min="0" max="0" step="1" value="0" aria-label="Coarsest visible glyph scale" list="visible-scale-ticks">
+          <datalist id="visible-scale-ticks"></datalist>
+          <div id="visible-scale-checkpoints" class="scale-checkpoints" role="group" aria-label="Isolate a scale checkpoint"></div>
+          <button id="visible-scale-all" class="text-button" type="button">Show all scales</button>
+          <p id="visible-scale-summary" class="control-help" aria-live="polite"></p>
+          <p class="control-help">Snap to size checkpoints. Move Coarsest left to hide broad blocks, or Finest right to hide fine marks. Click a checkpoint to isolate that size. Preview and PNG change instantly; no new fit.</p>
+        </fieldset>
+        <label class="range-label" for="history-glyph-budget">Glyphs <output id="history-budget-value">0</output></label>
+        <input id="history-glyph-budget" type="range" min="0" max="0" step="1" value="0" aria-label="Preview glyph count">
+        <button id="budget-loop" type="button">Play</button>
+        <p class="control-help">Browse the computed run by glyph count. This never runs the optimizer. Play loops from the first count to the last.</p>
+        <label class="check compare-toggle" for="compare-original"><span>Original alongside</span><input id="compare-original" type="checkbox" checked></label>
+      </section>
+      <section id="inspect-panel" class="panel-section" hidden>
+        <h3>3 · Inspect <span class="scope-badge">Selected step</span></h3>
+        <p class="section-guide">A glyph count can have several refinement steps. Inspect replacements and cleanup here.</p>
+        <div class="scale-table-wrap"><table class="scale-table"><caption>Convergence by scale</caption><thead><tr><th>Scale</th><th>Accepted edits</th><th>Rounds</th><th>Stop</th></tr></thead><tbody id="scale-convergence"></tbody></table></div>
+        <p class="control-help">Edits include additions and refinements, not rejected proposals. Settled means no qualifying edit was found in the bounded search. Budget means the run stopped early.</p>
+        <label class="range-label" for="iteration">Recorded step <output id="iteration-value">0 / 0</output></label>
+        <input id="iteration" type="range" min="0" max="0" step="1" value="0" aria-label="Optimization iteration">
+        <label class="check compare-toggle" for="show-residual"><span>Show error map</span><input id="show-residual" type="checkbox"></label>
+        <p class="control-help">Raw residual ×4: red means too dark; blue means too light. White means matched.</p>
+        <p class="control-help">The curve shows the total objective: image error plus overlap cost. Lower is better within this run; it is not a perceptual quality rating.</p>
+        <svg id="energy-curve" viewBox="0 0 224 56" role="img" aria-label="Energy over optimization iterations"></svg>
+        <p id="iteration-metrics" class="iteration-metrics"></p>
+        <p id="iteration-scales" class="control-help"></p>
+        <p id="iteration-action" class="control-help"></p>
+        <p id="iteration-stop" class="control-help"></p>
+        <button id="download-trace" type="button">Download trace JSON</button>
+      </section>
+
+
+
       <p class="privacy">Processed on your device.</p>
-      <p id="runtime-note" class="runtime-note">The first render downloads the Python runtime. This can take a minute.</p>
+      <p id="runtime-note" class="runtime-note">The first grid render downloads the Python runtime.</p>
     </aside>
   </main>
   <noscript>This converter needs JavaScript and WebAssembly enabled.</noscript>

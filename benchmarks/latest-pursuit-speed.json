@@ -1,0 +1,92 @@
+{
+  "runtime": "Bun 1.4.2",
+  "hardware": "Apple M1 Pro",
+  "scope": "Single native CPU full optimizer runs including history and verification; excludes export and browser/GPU execution. Not controlled repeated trials.",
+  "fixtures": "Cached measured FiraCode atlases: Taylor 42 characters, spacesuit 50 characters. Regenerating with current dictionary changes the candidates.",
+  "runs": [
+    {
+      "label": "taylor-before",
+      "effort": "thorough",
+      "beam": 2,
+      "budget": 64,
+      "ms": 10213.165208,
+      "glyphs": 64,
+      "energy": 0.08833530093545874,
+      "pixelError": 0.06473407917452537,
+      "contourError": 0.007867073920311126,
+      "diversity": 11,
+      "candidates": 966882,
+      "stopReason": "Glyph budget reached"
+    },
+    {
+      "label": "taylor-thorough",
+      "effort": "thorough",
+      "beam": 2,
+      "budget": 64,
+      "ms": 10406.562667,
+      "glyphs": 64,
+      "energy": 0.08833530093545874,
+      "pixelError": 0.06473407917452537,
+      "contourError": 0.007867073920311126,
+      "diversity": 11,
+      "candidates": 962135,
+      "stopReason": "Glyph budget reached"
+    },
+    {
+      "label": "taylor-fast-64",
+      "effort": "fast",
+      "beam": 1,
+      "budget": 64,
+      "ms": 2753.003542,
+      "glyphs": 64,
+      "energy": 0.09628819164036098,
+      "pixelError": 0.07217448685518785,
+      "contourError": 0.00803790159505771,
+      "diversity": 10,
+      "candidates": 253534,
+      "stopReason": "Glyph budget reached"
+    },
+    {
+      "label": "taylor-fast-256",
+      "effort": "fast",
+      "beam": 1,
+      "budget": 256,
+      "ms": 3753.2565,
+      "glyphs": 110,
+      "energy": 0.08180420020825527,
+      "pixelError": 0.0579307722112462,
+      "contourError": 0.007957809332336354,
+      "diversity": 20,
+      "candidates": 493756,
+      "stopReason": "No improving proposal in the bounded search"
+    },
+    {
+      "label": "spacesuit-thorough",
+      "effort": "thorough",
+      "beam": 2,
+      "budget": 64,
+      "ms": 3380.37575,
+      "glyphs": 32,
+      "energy": 0.07894937956452612,
+      "pixelError": 0.007244153398638079,
+      "contourError": 0.008963153270736005,
+      "diversity": 20,
+      "candidates": 634341,
+      "stopReason": "No improving proposal in the bounded search"
+    },
+    {
+      "label": "spacesuit-fast",
+      "effort": "fast",
+      "beam": 1,
+      "budget": 64,
+      "ms": 2178.789958,
+      "glyphs": 54,
+      "energy": 0.07373577858663426,
+      "pixelError": 0.006355223935624987,
+      "contourError": 0.008422569331376159,
+      "diversity": 26,
+      "candidates": 486137,
+      "stopReason": "No improving proposal in the bounded search"
+    }
+  ]
+}
