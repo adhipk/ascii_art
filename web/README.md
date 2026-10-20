@@ -278,3 +278,47 @@ Tests prove the browser-grid path skips Python glyph-atlas generation, check
 metric validation, verify ink contrast/preservation, and check that export draws
 real text at the expected positions/colors using a canvas test double. Real
 browser font rendering and layout remain unverified in this restricted session.
+# Fixed-grid shape matching and reproducible projects
+
+Enable **Shape matching + ligatures** in fixed layout to fit measured Fira Code
+single characters and two-character shapes. The bundled OFL font loads locally;
+no system font installation or external font service is needed. The 18-character
+vocabulary produces up to 342 masks including ordinary pairs and ligatures.
+Masks are cached by font size and exact duplicate masks are removed per span.
+
+The worker retains the Python renderer's grid geometry, ink colors, paper and
+contour selections. For each one- and two-cell patch it minimizes normalized ink
+coverage squared error plus `4 * area * (normalized mask density - base tone)^2`.
+Base tone comes from the existing density-calibrated grid, retaining tonal edge
+emphasis. Explicit directional edge replacements remain single cells, and pairs
+cannot cross them. A pair receives the rounded mean of its cells' RGB ink colors.
+This is a grayscale coverage/tone objective, not literal RGB reconstruction.
+
+The matcher first scores a seed, then applies independent 1×1, 2×2 and 4×4 block
+lower bounds, including the nonnegative tone cost. Pixel scoring exits when its
+partial cost cannot win. Dynamic programming finds the minimum-cost composition
+of each row, including odd column counts. Ties are deterministic. The exhaustive
+path remains available to regression tests. The status bar reports candidates
+rejected before pixel scoring, separately from partial pixel exits.
+
+The preview and PNG use the exact same measured masks and native-resolution
+pixels. Shapes never rejoin across candidate boundaries during display/export.
+Plain text is still downloadable, but external viewers may join sequences
+differently, and require Fira Code for similar appearance. Copying/selecting live
+text remains available in the original fixed mode; shape mode displays a canvas.
+
+**Export options** downloads all selected controls as `key: value` lines.
+**Save project** downloads a versioned JSON file after a successful render. It
+contains the exact input RGBA bytes, control values and measured font metrics /
+shape atlas, without remote image links. **Load project** validates these values,
+restores controls, and reruns generation. Saved atlases remain in use when changing
+non-font controls; changing font size, layout or matching mode remeasures them.
+No random search is involved. The format identifies the algorithm version and
+rejects incompatible versions. Identical shape-preview pixels after reload are
+verified in Chromium; cross-engine image resampling and external edge-model
+runtime differences are not promised to be bit-identical.
+
+Validation: Bun matcher/DP/state regression tests, existing Python regressions,
+and desktop/mobile Chromium checks of PNG equality, project reload equality and
+options export. See `../benchmarks/README.md` for the standalone pruning POC;
+its timing numbers do not measure the integrated tone-aware objective.

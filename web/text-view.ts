@@ -1,4 +1,5 @@
 import type { RenderResult } from "./renderer";
+import { shapePixels } from "./shape-grid";
 export const CHARACTERS = " .:-=+*#%@";
 export const FONT_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 export interface TextMetrics {
@@ -71,6 +72,14 @@ function same(data: Uint8Array, a: number, b: number): boolean {
 }
 export function textPreview(result: RenderResult): DocumentFragment {
   const fragment = document.createDocumentFragment();
+  if (result.shapes) {
+    const canvas = shapeCanvas(result);
+    canvas.style.width = canvas.style.height = "100%";
+    canvas.style.display = "block";
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "ASCII art with measured character and ligature shapes");
+    fragment.append(canvas); return fragment;
+  }
   if (result.tiles) {
     const namespace = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(namespace, "svg");
@@ -124,6 +133,10 @@ export function paperBackground(result: RenderResult): string {
   return `linear-gradient(to bottom, ${stops.join(",")})`;
 }
 export function exportTextPng(result: RenderResult, size: number): Promise<Blob> {
+  if (result.shapes) {
+    const canvas = shapeCanvas(result);
+    return new Promise((resolve,reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("PNG export failed")), "image/png"));
+  }
   const canvas = document.createElement("canvas");
   const scale = Math.min(2, Math.sqrt(12_000_000 / (result.width * result.height)));
   canvas.width = Math.round(result.width * scale); canvas.height = Math.round(result.height * scale);
@@ -156,4 +169,10 @@ export function exportTextPng(result: RenderResult, size: number): Promise<Blob>
     context.fillText(lines[row][col], col * result.cellWidth, row * result.cellHeight + metrics.baseline);
   }
   return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG export failed")), "image/png"));
+}
+
+function shapeCanvas(result: RenderResult): HTMLCanvasElement {
+  const canvas=document.createElement("canvas"); canvas.width=result.width; canvas.height=result.height;
+  canvas.getContext("2d")!.putImageData(new ImageData(shapePixels(result),result.width,result.height),0,0);
+  return canvas;
 }

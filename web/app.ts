@@ -2,6 +2,8 @@ import { textMetrics, squareTextMetrics, textPreview, paperBackground, exportTex
 import { EXAMPLES, exampleUrl, type Example } from "./examples";
 import { RenderQueue } from "./render-queue";
 import { Renderer, type RenderInput, type RenderResult, type RenderSettings } from "./renderer";
+import { loadShapeFont, shapeAtlas } from "./shape-font";
+import { captureOptions, restoreOptions, exportOptions, encodeProject, decodeProject } from "./project-state";
 
 function element<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -32,13 +34,16 @@ let showingOriginal = false;
 let downloadsReady = false;
 let disposed = false;
 let exampleDownload: AbortController | undefined;
+let savedMetrics: Pick<RenderSettings,"text_metrics"|"adaptive_metrics"|"shape_atlas"> | undefined;
+let lastSettings: RenderSettings | undefined;
+let scheduleVersion = 0;
 const exampleButtons = new Map<string, HTMLButtonElement>();
 
 function message(value: string, error = false): void {
   status.textContent = value;
   status.classList.toggle("error", error);
 }
-function disableDownloads(): void { downloadsReady = false; png.disabled = text.disabled = true; }
+function disableDownloads(): void { downloadsReady = false; png.disabled = text.disabled = true; element<HTMLButtonElement>("save-project").disabled=true; }
 function releaseOutput(): void {
   if (textUrl) URL.revokeObjectURL(textUrl);
   rendered = undefined;
@@ -58,7 +63,7 @@ function updateView(): void {
 const renderer = new Renderer((value, id) => { if (queue.isCurrent(id)) message(value); });
 const queue = new RenderQueue<RenderInput, RenderResult>({
   render: (input, id) => renderer.render(input, id),
-  result: (result, input, id) => { displayResult(result, id, input.settings.font_size); },
+  result: (result, input, id) => { lastSettings=input.settings; displayResult(result, id, input.settings.font_size); },
   error: (error) => {
     message(error instanceof Error ? error.message : "Could not render image", true);
     retry.hidden = false;
@@ -79,7 +84,7 @@ function fitText(): void {
   const scale = actualSize ? 1 : Math.min((stage.clientWidth - inset) / rendered.width, (stage.clientHeight - inset) / rendered.height);
   output.style.width = `${rendered.width * scale}px`;
   output.style.height = `${rendered.height * scale}px`;
-  if (rendered.tiles) {
+  if (rendered.tiles || rendered.shapes) {
     output.style.letterSpacing = "0px";
     return;
   }
@@ -102,11 +107,13 @@ function displayResult(result: RenderResult, id: number, fontSize: number): void
     fitText();
     downloadsReady = true;
     png.disabled = text.disabled = false;
+    element<HTMLButtonElement>("save-project").disabled=false;
     element("dimensions").textContent = result.tiles ? `${result.tiles.length} glyphs · 8 / 16 / 32 px` : `${result.columns} × ${result.rows} characters`;
     text.textContent = result.tiles ? "Text · fixed grid" : "Text";
-    text.title = result.tiles ? "Plain text uses the separate fixed 8×8 grid. PNG preserves mixed sizes." : "Download character grid";
+    text.title = result.shapes ? "Plain text needs Fira Code and may shape across pair boundaries. PNG preserves the exact fitted shapes." : result.tiles ? "Plain text uses the separate fixed 8×8 grid. PNG preserves mixed sizes." : "Download character grid";
     element("runtime-note").hidden = true;
-    message("Up to date");
+    const stats=result.shapes?.stats;
+    message(stats ? `Up to date · ${Math.round(100*stats.culled/Math.max(1,stats.candidates))}% candidates pruned` : "Up to date");
   } catch (error) {
     message(error instanceof Error ? error.message : "Could not display preview", true);
     retry.hidden = false;
@@ -118,10 +125,13 @@ function settings(): RenderSettings {
   const rgb = [1, 3, 5].map((i) => parseInt(background.slice(i, i + 2), 16));
   const reference = element<HTMLSelectElement>("edge-method").value === "acerola";
   const adaptive = element<HTMLSelectElement>("layout").value === "adaptive";
+  const atlas = !adaptive && element<HTMLInputElement>("shape-matching").checked ? savedMetrics?.shape_atlas ?? shapeAtlas(Number(element<HTMLSelectElement>("font-size").value)) : undefined;
   return {
     columns: Number(columns.value),
     font_size: Number(element<HTMLSelectElement>("font-size").value),
-    text_metrics: textMetrics(Number(element<HTMLSelectElement>("font-size").value)),
+    text_metrics: atlas ? {width:atlas.width,height:atlas.height,advance:atlas.width,baseline:atlas.baseline,
+      densities:[..." .:-=+*#%@"].map(char=>{const mask=atlas.candidates.find(c=>c.text===char)!.mask;return mask.reduce((a,b)=>a+b,0)/mask.length;})} : textMetrics(Number(element<HTMLSelectElement>("font-size").value)),
+    shape_atlas: atlas,
     layout: adaptive ? "adaptive" : "fixed",
     adaptive_metrics: adaptive ? Object.fromEntries([8, 16, 32].map((size) => [String(size), squareTextMetrics(size)])) : undefined,
     use_edge: edges.checked && (reference || Number(edgeAmount.value) > 0),
@@ -133,9 +143,11 @@ function settings(): RenderSettings {
     use_color: element<HTMLInputElement>("color").checked,
     background_mode: element<HTMLSelectElement>("background-mode").value as "solid" | "source",
     background, foreground: rgb[0] * .299 + rgb[1] * .587 + rgb[2] * .114 < 128 ? "#ffffff" : "#242424",
+    ...savedMetrics,
   };
 }
 function updateControls(): void {
+  element<HTMLInputElement>("shape-matching").disabled = element<HTMLSelectElement>("layout").value === "adaptive";
   element<HTMLSelectElement>("font-size").disabled = element<HTMLSelectElement>("layout").value === "adaptive";
   element<HTMLOutputElement>("columns-value").value = columns.value;
   element<HTMLOutputElement>("edge-value").value = edgeAmount.value;
@@ -156,9 +168,18 @@ function schedule(immediate = false): void {
   if (!source || disposed) return;
   disableDownloads();
   retry.hidden = true;
-  queue.request({ pixels: source, sourceVersion, settings: settings() }, immediate);
+  const version=++scheduleVersion;
+  queue.pause(); // Invalidate an old result before an asynchronous font load.
+  void (async()=>{
+    try {
+      if(element<HTMLInputElement>("shape-matching").checked && !savedMetrics?.shape_atlas) await loadShapeFont();
+      if(version!==scheduleVersion || !source || disposed) return;
+      queue.request({ pixels: source, sourceVersion, settings: settings() }, immediate);
+    } catch(error) {message(error instanceof Error ? error.message : "Could not load ligature font",true); retry.hidden=false;}
+  })();
 }
 function acceptSource(pixels: ImageData, name: string, exampleId?: string): void {
+  lastSettings=undefined;
   for (const [id, button] of exampleButtons) button.setAttribute("aria-pressed", String(id === exampleId));
   ++sourceVersion;
   
@@ -260,10 +281,14 @@ for (const example of EXAMPLES) {
   element("examples").append(button);
 }
 form.addEventListener("submit", (event) => event.preventDefault());
-form.addEventListener("input", () => schedule());
-element("reset").addEventListener("click", () => { form.reset(); schedule(); });
+form.addEventListener("input", event => {
+  if(["font-size","layout","shape-matching"].includes((event.target as HTMLElement).id)) savedMetrics=undefined;
+  schedule();
+});
+element("reset").addEventListener("click", () => { savedMetrics=undefined; form.reset(); schedule(); });
 retry.addEventListener("click", () => schedule(true));
 cancel.addEventListener("click", () => {
+  ++scheduleVersion;
   exampleDownload?.abort();
   exampleDownload = undefined;
   ++fileVersion;
@@ -309,6 +334,32 @@ png.addEventListener("click", async () => {
   finally { png.disabled = !downloadsReady; }
 });
 text.addEventListener("click", () => download(textUrl, "ascii-art.txt"));
+function downloadBlob(blob: Blob, name: string): void {
+  const url=URL.createObjectURL(blob); download(url,name); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+element("export-options").addEventListener("click",()=>downloadBlob(new Blob([exportOptions(captureOptions(form))],{type:"text/plain"}),"ascii-options.txt"));
+element("save-project").addEventListener("click",()=>{
+  if(!source) return;
+  try {
+    if(!downloadsReady || !lastSettings) throw new Error("Wait for rendering to finish before saving the project");
+    const metrics=lastSettings;
+    downloadBlob(new Blob([encodeProject(source,captureOptions(form),metrics)],{type:"application/json"}),"ascii-project.json");
+  } catch(error) {message(error instanceof Error ? error.message : "Could not save project",true);}
+});
+const projectFile=element<HTMLInputElement>("project-file");
+element("load-project").addEventListener("click",()=>projectFile.click());
+projectFile.addEventListener("change",async()=>{
+  const selected=projectFile.files?.[0]; projectFile.value=""; if(!selected) return;
+  try {
+    if(selected.size>30_000_000) throw new Error("Project file exceeds 30 MB");
+    const project=decodeProject(await selected.text());
+    restoreOptions(form,project.options);
+    queue.cancel(); renderer.stop(); ++scheduleVersion;
+    exampleDownload?.abort(); ++fileVersion;
+    savedMetrics=project.metrics;
+    acceptSource(new ImageData(project.pixels,project.width,project.height),"Restored project");
+  } catch(error) {message(error instanceof Error ? error.message : "Could not load project",true);}
+});
 window.addEventListener("pagehide", () => { exampleDownload?.abort(); disposed = true;  queue.cancel(); renderer.stop(); releaseOutput(); });
 // BFCache restoration should remain usable after releasing the worker/resources.
 window.addEventListener("pageshow", (event) => { if (event.persisted) { disposed = false; schedule(true); } });

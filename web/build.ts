@@ -14,5 +14,6 @@ await cp(resolve(root, "../src/ascii_art"), resolve(dist, "python/ascii_art"), {
   recursive: true, filter: (path) => !path.includes("__pycache__") && !path.includes("/assets"),
 });
 await cp(resolve(root, "examples"), resolve(dist, "examples"), { recursive: true });
+await cp(resolve(root, "fonts"), resolve(dist, "fonts"), { recursive: true });
 await cp(resolve(root, "bridge.py"), resolve(dist, "python/bridge.py"));
 console.log(`Built static site: ${dist}`);
